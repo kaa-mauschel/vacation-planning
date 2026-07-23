@@ -113,25 +113,35 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const { data: project, error } = await supabase
+    setError("");
+    const { data: project, error: insertError } = await supabase
       .from("projects")
       .insert({ name: name.trim(), emoji, created_by: userId })
       .select()
       .single();
 
-    if (!error && project) {
-      // Standard-Startdaten für die neuen Reiter anlegen
-      const rows = [
-        ...DEFAULT_PACKLIST.map((it, i) => ({ project_id: project.id, section: SECTIONS.PACKLISTE, data: it, position: i })),
-        ...DEFAULT_VORABREISE.map((it, i) => ({ project_id: project.id, section: SECTIONS.VORABREISE, data: it, position: i })),
-        ...DEFAULT_TIPS.map((it, i) => ({ project_id: project.id, section: SECTIONS.TIPP, data: it, position: i })),
-      ];
-      if (rows.length) await supabase.from("items").insert(rows);
+    if (insertError || !project) {
+      setSaving(false);
+      setError(
+        insertError?.message?.includes("row-level security")
+          ? "Konnte nicht gespeichert werden – deine Anmeldung scheint abgelaufen zu sein. Bitte einmal ab- und wieder anmelden."
+          : `Fehler: ${insertError?.message || "Unbekannter Fehler"}`
+      );
+      return;
     }
+
+    const rows = [
+      ...DEFAULT_PACKLIST.map((it, i) => ({ project_id: project.id, section: SECTIONS.PACKLISTE, data: it, position: i })),
+      ...DEFAULT_VORABREISE.map((it, i) => ({ project_id: project.id, section: SECTIONS.VORABREISE, data: it, position: i })),
+      ...DEFAULT_TIPS.map((it, i) => ({ project_id: project.id, section: SECTIONS.TIPP, data: it, position: i })),
+    ];
+    if (rows.length) await supabase.from("items").insert(rows);
+
     setSaving(false);
     onCreated();
     onClose();
@@ -160,6 +170,7 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
           </button>
         ))}
       </div>
+      {error && <div style={{ color: STYLE.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
       <button
         onClick={handleCreate}
         disabled={saving || !name.trim()}
