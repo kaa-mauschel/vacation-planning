@@ -9,6 +9,7 @@ import { DEFAULT_PACKLIST, DEFAULT_VORABREISE, DEFAULT_TIPS } from "@/lib/defaul
 import { SECTIONS } from "@/lib/types";
 import type { Project } from "@/lib/types";
 import { Plus, LogOut, Users, X, Luggage } from "lucide-react";
+import { patchFetchForDebug, getLastRequestTo } from "@/lib/networkDebug";
 
 const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒"];
 
@@ -19,6 +20,10 @@ export default function ProjectsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+
+  useEffect(() => {
+    patchFetchForDebug();
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -150,6 +155,7 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
 
     if (insertError || !project) {
       setSaving(false);
+      const netDebug = getLastRequestTo("/projects");
       setError(
         `Fehler beim Speichern:\n` +
         `Code: ${insertError?.code || "-"}\n` +
@@ -157,7 +163,16 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
         (insertError?.details ? `Details: ${insertError.details}\n` : "") +
         (insertError?.hint ? `Hinweis: ${insertError.hint}\n` : "") +
         `\nDeine Nutzer-ID (Client): ${userId}\n` +
-        tokenInfo
+        tokenInfo +
+        `\n--- Tatsächlich gesendete Anfrage ---\n` +
+        (netDebug
+          ? `Methode: ${netDebug.method}\n` +
+            `URL: ${netDebug.url}\n` +
+            `Status: ${netDebug.status}\n` +
+            `Header "authorization": ${netDebug.headers["authorization"] || "❌ FEHLT KOMPLETT"}\n` +
+            `Header "apikey": ${netDebug.headers["apikey"] || "❌ FEHLT KOMPLETT"}\n` +
+            `Server-Antwort: ${netDebug.responseBody || "-"}`
+          : "Keine Anfrage erfasst (unerwartet).")
       );
       return;
     }
