@@ -128,6 +128,20 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
       return;
     }
 
+    // Token-Inhalt zur Diagnose entschlüsseln (nur lesen, keine Prüfung nötig)
+    let tokenInfo = "";
+    try {
+      const token = sessionData.session.access_token;
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      tokenInfo =
+        `Token-sub (=auth.uid() sollte sein): ${payload.sub}\n` +
+        `Token-role: ${payload.role}\n` +
+        `Token läuft ab: ${new Date(payload.exp * 1000).toLocaleString("de-DE")}\n` +
+        `Jetzt: ${new Date().toLocaleString("de-DE")}\n`;
+    } catch (e) {
+      tokenInfo = `Token konnte nicht gelesen werden: ${e}\n`;
+    }
+
     const { data: project, error: insertError } = await supabase
       .from("projects")
       .insert({ name: name.trim(), emoji, created_by: userId })
@@ -142,8 +156,8 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
         `Nachricht: ${insertError?.message || "unbekannt"}\n` +
         (insertError?.details ? `Details: ${insertError.details}\n` : "") +
         (insertError?.hint ? `Hinweis: ${insertError.hint}\n` : "") +
-        `\nDeine Nutzer-ID: ${userId}\n` +
-        `Sitzung vorhanden: ja`
+        `\nDeine Nutzer-ID (Client): ${userId}\n` +
+        tokenInfo
       );
       return;
     }
