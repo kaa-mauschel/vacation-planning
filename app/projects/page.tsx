@@ -119,6 +119,15 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
     if (!name.trim()) return;
     setSaving(true);
     setError("");
+
+    // Diagnose: haben wir wirklich eine gültige Sitzung?
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      setSaving(false);
+      setError("Keine gültige Sitzung gefunden (Session leer). Bitte einmal abmelden und neu anmelden.");
+      return;
+    }
+
     const { data: project, error: insertError } = await supabase
       .from("projects")
       .insert({ name: name.trim(), emoji, created_by: userId })
@@ -128,9 +137,13 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
     if (insertError || !project) {
       setSaving(false);
       setError(
-        insertError?.message?.includes("row-level security")
-          ? "Konnte nicht gespeichert werden – deine Anmeldung scheint abgelaufen zu sein. Bitte einmal ab- und wieder anmelden."
-          : `Fehler: ${insertError?.message || "Unbekannter Fehler"}`
+        `Fehler beim Speichern:\n` +
+        `Code: ${insertError?.code || "-"}\n` +
+        `Nachricht: ${insertError?.message || "unbekannt"}\n` +
+        (insertError?.details ? `Details: ${insertError.details}\n` : "") +
+        (insertError?.hint ? `Hinweis: ${insertError.hint}\n` : "") +
+        `\nDeine Nutzer-ID: ${userId}\n` +
+        `Sitzung vorhanden: ja`
       );
       return;
     }
@@ -170,7 +183,7 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
           </button>
         ))}
       </div>
-      {error && <div style={{ color: STYLE.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+      {error && <div style={{ color: STYLE.danger, fontSize: 12.5, marginBottom: 12, whiteSpace: "pre-line", background: "#FBEAEA", borderRadius: 8, padding: "8px 10px" }}>{error}</div>}
       <button
         onClick={handleCreate}
         disabled={saving || !name.trim()}
