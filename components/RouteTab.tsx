@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag } from "@/lib/types";
-import { MapPin, Plus, X, Pencil, ArrowUp, ArrowDown } from "lucide-react";
+import { MapPin, Plus, X, Pencil, GripVertical } from "lucide-react";
 
 function mapsDirectionsLink(from: string, to: string) {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=driving`;
@@ -19,35 +19,39 @@ export default function RouteTab({ projectId }: { projectId: string }) {
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const normalizedOnce = useRef(false);
 
-  // Items sind bereits nach position sortiert (kommt so aus useItems).
-  const sorted = items;
+  // Lokale Reihenfolge fürs Drag & Drop (optimistisch, wird beim Loslassen gespeichert)
+  const [order, setOrder] = useState<typeof items>([]);
+  const dragIndexRef = useRef<number | null>(null);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const draggingRef = useRef(false);
 
-  // Einmaliges Reparieren: falls Positionen durcheinander/gleich sind (z. B. alte Einträge,
-  // die alle Position 0 hatten), nach Datum neu durchnummerieren.
+  useEffect(() => {
+    if (draggingRef.current) return; // während des Ziehens nicht von außen überschreiben
+    setOrder(items);
+  }, [items]);
+
+  // Einmaliges Reparieren: falls Positionen durcheinander/gleich sind (alte Einträge, die
+  // alle Position 0 hatten), nach Datum neu durchnummerieren.
   useEffect(() => {
     if (loading || normalizedOnce.current || items.length < 2) return;
     const positions = items.map((it) => it.position);
     const hasDuplicates = new Set(positions).size !== positions.length;
-    if (!hasDuplicates) {
-      normalizedOnce.current = true;
-      return;
-    }
     normalizedOnce.current = true;
+    if (!hasDuplicates) return;
     const byDate = [...items].sort((a, b) => {
       if (a.data.date && b.data.date) return a.data.date.localeCompare(b.data.date);
       if (a.data.date) return -1;
       if (b.data.date) return 1;
       return a.created_at.localeCompare(b.created_at);
     });
-    reorderAll(byDate.map((it) => it.id));
+    persistOrder(byDate.map((it) => it.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, items.length]);
 
-  const reorderAll = async (orderedIds: string[]) => {
+  const persistOrder = async (orderedIds: string[]) => {
     const { supabase } = await import("@/lib/supabaseClient");
-    for (let i = 0; i < orderedIds.length; i++) {
-      await supabase.from("items").update({ position: i }).eq("id", orderedIds[i]);
-    }
+    await Promise.all(orderedIds.map((id, i) => supabase.from("items").update({ position: i }).eq("id", id)));
     await reload();
   };
 
@@ -55,11 +59,10 @@ export default function RouteTab({ projectId }: { projectId: string }) {
 
   const submit = () => {
     if (!form.from.trim() || !form.to.trim()) return;
-    // Chronologisch einsortieren: Position anhand des Datums bestimmen
-    let insertAt = sorted.length;
+    let insertAt = order.length;
     if (form.date) {
-      insertAt = sorted.findIndex((it) => it.data.date && it.data.date > form.date);
-      if (insertAt === -1) insertAt = sorted.length;
+      insertAt = order.findIndex((it) => it.data.date && it.data.date > form.date);
+      if (insertAt === -1) insertAt = order.length;
     }
     addItem(form, insertAt);
     setForm(EMPTY_FORM);
@@ -79,35 +82,60 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     setEditingId(null);
   };
 
-  const move = (index: number, direction: -1 | 1) => {
-    const otherIndex = index + direction;
-    if (otherIndex < 0 || otherIndex >= sorted.length) return;
-    const a = sorted[index];
-    const b = sorted[otherIndex];
-    // Positionen tauschen
-    swapPositions(a.id, a.position, b.id, b.position);
+  // --- Drag & Drop (Pointer Events, funktioniert mit Maus & Touch) ---
+
+  const handlePointerDown = (e: React.PointerEvent, index: number) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    dragIndexRef.current = index;
+    setDraggingId(order[index].id);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  const swapPositions = async (idA: string, posA: number, idB: string, posB: number) => {
-    await Promise.all([
-      supabaseUpdatePosition(idA, posB),
-      supabaseUpdatePosition(idB, posA),
-    ]);
-    await reload(); // sofort sichtbar, nicht erst auf Realtime warten
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (dragIndexRef.current === null) return;
+    const currentIndex = dragIndexRef.current;
+    const pointerY = e.clientY;
+
+    // Finde die Zeile, über der sich der Finger/Cursor gerade befindet
+    let targetIndex = currentIndex;
+    for (let i = 0; i < order.length; i++) {
+      const el = rowRefs.current[order[i].id];
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (pointerY < mid) {
+        targetIndex = i;
+        break;
+      }
+      targetIndex = i + 1;
+    }
+    targetIndex = Math.max(0, Math.min(order.length - 1, targetIndex));
+
+    if (targetIndex !== currentIndex) {
+      const next = [...order];
+      const [moved] = next.splice(currentIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      setOrder(next);
+      dragIndexRef.current = targetIndex;
+    }
   };
 
-  const supabaseUpdatePosition = async (id: string, position: number) => {
-    const { supabase } = await import("@/lib/supabaseClient");
-    await supabase.from("items").update({ position }).eq("id", id);
+  const handlePointerUp = () => {
+    if (dragIndexRef.current === null) return;
+    dragIndexRef.current = null;
+    setDraggingId(null);
+    draggingRef.current = false;
+    persistOrder(order.map((it) => it.id));
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17, marginBottom: 10 }}>Route</div>
-        {sorted.length === 0 && <p style={{ fontSize: 13.5, color: "#9A9384" }}>Noch keine Etappen eingetragen.</p>}
+        {order.length === 0 && <p style={{ fontSize: 13.5, color: "#9A9384" }}>Noch keine Etappen eingetragen.</p>}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {sorted.map((it, index) => {
+          {order.map((it, index) => {
             const isEditing = editingId === it.id;
             if (isEditing) {
               return (
@@ -135,11 +163,28 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                 </div>
               );
             }
+            const isDragging = draggingId === it.id;
             return (
-              <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: STYLE.paperDim, borderRadius: 10 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
-                  <button onClick={() => move(index, -1)} disabled={index === 0} style={{ background: "none", border: "none", color: index === 0 ? "#D8D2C4" : "#9A9384", padding: 0 }}><ArrowUp size={14} /></button>
-                  <button onClick={() => move(index, 1)} disabled={index === sorted.length - 1} style={{ background: "none", border: "none", color: index === sorted.length - 1 ? "#D8D2C4" : "#9A9384", padding: 0 }}><ArrowDown size={14} /></button>
+              <div
+                key={it.id}
+                ref={(el) => { rowRefs.current[it.id] = el; }}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "8px 10px",
+                  background: isDragging ? "#EFE6D8" : STYLE.paperDim, borderRadius: 10,
+                  boxShadow: isDragging ? "0 4px 14px rgba(58,53,48,0.18)" : "none",
+                  transform: isDragging ? "scale(1.02)" : "none",
+                  transition: isDragging ? "none" : "background 0.15s",
+                  touchAction: "none",
+                }}
+              >
+                <div
+                  onPointerDown={(e) => handlePointerDown(e, index)}
+                  style={{ cursor: "grab", color: "#B0A996", flexShrink: 0, padding: "6px 2px", touchAction: "none" }}
+                >
+                  <GripVertical size={16} />
                 </div>
                 <a
                   href={mapsDirectionsLink(it.data.from, it.data.to)}
@@ -160,6 +205,11 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             );
           })}
         </div>
+        {order.length > 1 && (
+          <p style={{ fontSize: 11.5, color: "#9A9384", marginTop: 10 }}>
+            Am Griff-Symbol (⋮⋮) links ziehen, um die Reihenfolge zu ändern.
+          </p>
+        )}
       </div>
 
       <div style={cardStyle}>
@@ -182,7 +232,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             <input placeholder="Längengrad (lon, optional – für Karte)" value={form.lon} onChange={(e) => setForm({ ...form, lon: e.target.value })} style={inputStyle} />
           </div>
           <p style={{ fontSize: 11.5, color: "#9A9384", margin: 0 }}>
-            Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert. Mit den Pfeilen ↑↓ links kannst du die Reihenfolge jederzeit von Hand anpassen.
+            Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert.
           </p>
           <button onClick={submit} style={{ padding: "10px 0", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Plus size={14} /> Etappe speichern
