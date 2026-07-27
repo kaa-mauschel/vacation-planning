@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag } from "@/lib/types";
-import { MapPin, Plus, X, Pencil, Check } from "lucide-react";
+import { MapPin, Plus, X, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 
 function mapsDirectionsLink(from: string, to: string) {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=driving`;
@@ -17,12 +17,50 @@ export default function RouteTab({ projectId }: { projectId: string }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
+  const normalizedOnce = useRef(false);
+
+  // Items sind bereits nach position sortiert (kommt so aus useItems).
+  const sorted = items;
+
+  // Einmaliges Reparieren: falls Positionen durcheinander/gleich sind (z. B. alte Einträge,
+  // die alle Position 0 hatten), nach Datum neu durchnummerieren.
+  useEffect(() => {
+    if (loading || normalizedOnce.current || items.length < 2) return;
+    const positions = items.map((it) => it.position);
+    const hasDuplicates = new Set(positions).size !== positions.length;
+    if (!hasDuplicates) {
+      normalizedOnce.current = true;
+      return;
+    }
+    normalizedOnce.current = true;
+    const byDate = [...items].sort((a, b) => {
+      if (a.data.date && b.data.date) return a.data.date.localeCompare(b.data.date);
+      if (a.data.date) return -1;
+      if (b.data.date) return 1;
+      return a.created_at.localeCompare(b.created_at);
+    });
+    reorderAll(byDate.map((it) => it.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, items.length]);
+
+  const reorderAll = async (orderedIds: string[]) => {
+    const { supabase } = await import("@/lib/supabaseClient");
+    for (let i = 0; i < orderedIds.length; i++) {
+      await supabase.from("items").update({ position: i }).eq("id", orderedIds[i]);
+    }
+  };
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
   const submit = () => {
     if (!form.from.trim() || !form.to.trim()) return;
-    addItem(form);
+    // Chronologisch einsortieren: Position anhand des Datums bestimmen
+    let insertAt = sorted.length;
+    if (form.date) {
+      insertAt = sorted.findIndex((it) => it.data.date && it.data.date > form.date);
+      if (insertAt === -1) insertAt = sorted.length;
+    }
+    addItem(form, insertAt);
     setForm(EMPTY_FORM);
   };
 
@@ -40,13 +78,34 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     setEditingId(null);
   };
 
+  const move = (index: number, direction: -1 | 1) => {
+    const otherIndex = index + direction;
+    if (otherIndex < 0 || otherIndex >= sorted.length) return;
+    const a = sorted[index];
+    const b = sorted[otherIndex];
+    // Positionen tauschen
+    swapPositions(a.id, a.position, b.id, b.position);
+  };
+
+  const swapPositions = async (idA: string, posA: number, idB: string, posB: number) => {
+    await Promise.all([
+      supabaseUpdatePosition(idA, posB),
+      supabaseUpdatePosition(idB, posA),
+    ]);
+  };
+
+  const supabaseUpdatePosition = async (id: string, position: number) => {
+    const { supabase } = await import("@/lib/supabaseClient");
+    await supabase.from("items").update({ position }).eq("id", id);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17, marginBottom: 10 }}>Route</div>
-        {items.length === 0 && <p style={{ fontSize: 13.5, color: "#9A9384" }}>Noch keine Etappen eingetragen.</p>}
+        {sorted.length === 0 && <p style={{ fontSize: 13.5, color: "#9A9384" }}>Noch keine Etappen eingetragen.</p>}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {items.map((it) => {
+          {sorted.map((it, index) => {
             const isEditing = editingId === it.id;
             if (isEditing) {
               return (
@@ -75,7 +134,11 @@ export default function RouteTab({ projectId }: { projectId: string }) {
               );
             }
             return (
-              <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: STYLE.paperDim, borderRadius: 10 }}>
+              <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: STYLE.paperDim, borderRadius: 10 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+                  <button onClick={() => move(index, -1)} disabled={index === 0} style={{ background: "none", border: "none", color: index === 0 ? "#D8D2C4" : "#9A9384", padding: 0 }}><ArrowUp size={14} /></button>
+                  <button onClick={() => move(index, 1)} disabled={index === sorted.length - 1} style={{ background: "none", border: "none", color: index === sorted.length - 1 ? "#D8D2C4" : "#9A9384", padding: 0 }}><ArrowDown size={14} /></button>
+                </div>
                 <a
                   href={mapsDirectionsLink(it.data.from, it.data.to)}
                   target="_blank"
@@ -117,7 +180,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             <input placeholder="Längengrad (lon, optional – für Karte)" value={form.lon} onChange={(e) => setForm({ ...form, lon: e.target.value })} style={inputStyle} />
           </div>
           <p style={{ fontSize: 11.5, color: "#9A9384", margin: 0 }}>
-            Tipp: lat/lon findest du z. B., wenn du den Ort in Google Maps suchst und die Zahlen aus der Adresszeile kopierst. Optional – ohne Koordinaten funktioniert alles außer der Landkarte in der Übersicht.
+            Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert. Mit den Pfeilen ↑↓ links kannst du die Reihenfolge jederzeit von Hand anpassen.
           </p>
           <button onClick={submit} style={{ padding: "10px 0", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Plus size={14} /> Etappe speichern

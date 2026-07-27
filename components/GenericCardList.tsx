@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
-import { MapPin, Star, Heart, Plus, X, Pencil } from "lucide-react";
+import { getAiSuggestions } from "@/lib/aiSuggestions";
+import { getStoredApiKey } from "@/lib/theme";
+import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2 } from "lucide-react";
+import Link from "next/link";
 
 function mapsSearchLink(name: string, context: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${context}`)}`;
@@ -16,18 +19,27 @@ export default function GenericCardList({
   section,
   groupLabel = "Gruppe",
   extraFieldLabel = "Ort/Kontext",
+  aiKind,
+  projectName = "",
+  routeContext = "",
 }: {
   projectId: string;
   section: string;
   groupLabel?: string;
   extraFieldLabel?: string;
+  aiKind?: "essen" | "aktivitaet" | "mustdo";
+  projectName?: string;
+  routeContext?: string;
 }) {
   const { items, loading, addItem, updateItem, deleteItem } = useItems(projectId, section);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
+
 
   const groups = Array.from(new Set(items.map((it) => it.data.group || "Allgemein")));
 
@@ -44,14 +56,48 @@ export default function GenericCardList({
     setEditingId(null);
   };
 
+  const handleAiSuggest = async () => {
+    if (!aiKind) return;
+    setAiLoading(true);
+    setAiError("");
+    const { suggestions, error } = await getAiSuggestions({ projectName, routeContext, kind: aiKind });
+    setAiLoading(false);
+    if (error) {
+      setAiError(error);
+      return;
+    }
+    for (const s of suggestions) {
+      await addItem({ name: s.name, type: s.type, group: s.group, context: s.context, note: s.note, rating: s.rating || "" });
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <button
-        onClick={() => setShowForm(true)}
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: `1px dashed #C9C2B0`, background: "transparent", color: STYLE.ink, fontSize: 14, fontWeight: 600 }}
-      >
-        <Plus size={16} /> Eintrag hinzufügen
-      </button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => setShowForm(true)}
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: `1px dashed #C9C2B0`, background: "transparent", color: STYLE.ink, fontSize: 14, fontWeight: 600 }}
+        >
+          <Plus size={16} /> Eintrag hinzufügen
+        </button>
+        {aiKind && (
+          <button
+            onClick={handleAiSuggest}
+            disabled={aiLoading}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: "none", background: STYLE.accent3, color: "#fff", fontSize: 14, fontWeight: 600, opacity: aiLoading ? 0.7 : 1 }}
+          >
+            {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {aiLoading ? "Lädt…" : "KI-Vorschläge"}
+          </button>
+        )}
+      </div>
+
+      {aiError && (
+        <div style={{ fontSize: 12.5, color: STYLE.danger, background: "#FBEAEA", borderRadius: 8, padding: "8px 10px" }}>
+          {aiError} {aiError.includes("Einstellungen") && <Link href="/settings" style={{ color: STYLE.accent4, fontWeight: 600 }}>Zu den Einstellungen</Link>}
+        </div>
+      )}
+
 
       {showForm && (
         <CardForm

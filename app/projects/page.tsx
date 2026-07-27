@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT, cardStyle } from "@/lib/style";
+import { useHeaderColor } from "@/lib/theme";
 import type { Project } from "@/lib/types";
-import { Plus, LogOut, Users, X, Luggage } from "lucide-react";
+import { Plus, LogOut, Users, X, Luggage, Settings } from "lucide-react";
 
 const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒", "🚗", "✈️"];
 
 export default function ProjectsPage() {
   const router = useRouter();
   const { user, loading } = useUser();
+  const headerColor = useHeaderColor();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -45,15 +47,20 @@ export default function ProjectsPage() {
     <div style={{ minHeight: "100vh", background: STYLE.paperDim }}>
       <style>{FONTS_IMPORT}</style>
 
-      <div style={{ background: STYLE.headerBg, color: STYLE.headerText, padding: "24px 20px" }}>
+      <div style={{ background: headerColor, color: STYLE.headerText, padding: "24px 20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Luggage size={22} />
             <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22 }}>Urlaubsplaner</span>
           </div>
-          <button onClick={handleLogout} style={{ background: "none", border: "none", color: STYLE.headerText, opacity: 0.7, display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
-            <LogOut size={15} /> Abmelden
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <button onClick={() => router.push("/settings")} style={{ background: "none", border: "none", color: STYLE.headerText, opacity: 0.75, display: "flex", alignItems: "center" }}>
+              <Settings size={17} />
+            </button>
+            <button onClick={handleLogout} style={{ background: "none", border: "none", color: STYLE.headerText, opacity: 0.7, display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+              <LogOut size={15} /> Abmelden
+            </button>
+          </div>
         </div>
         <p style={{ fontSize: 13, opacity: 0.7, marginTop: 6 }}>{user.email}</p>
       </div>

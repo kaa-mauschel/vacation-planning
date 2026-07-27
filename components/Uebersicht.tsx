@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag, SECTIONS } from "@/lib/types";
+import { useHeaderColor } from "@/lib/theme";
 import { MapPin, Sparkles } from "lucide-react";
 
 export default function Uebersicht({ projectId, startDate }: { projectId: string; startDate: string | null }) {
@@ -25,11 +26,9 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     }
   };
 
-  // Route chronologisch sortiert (nach Datum, sonst nach Position/Erstellung)
-  const sortedRoute = [...routeItems].sort((a, b) => {
-    if (a.data.date && b.data.date) return a.data.date.localeCompare(b.data.date);
-    return (a.position ?? 0) - (b.position ?? 0);
-  });
+  // Reihenfolge kommt bereits sortiert nach position aus useItems (= die Reihenfolge,
+  // die im Route-Tab per Datum bzw. manuell mit den Pfeilen festgelegt wurde).
+  const sortedRoute = routeItems;
 
   const totalKm = sortedRoute.reduce((sum, it) => {
     const n = parseFloat(String(it.data.km || "").replace(/[^\d.,]/g, "").replace(",", "."));
@@ -116,6 +115,7 @@ function SectionTitle({ icon: Icon, text }: { icon: any; text: string }) {
 }
 
 function Countdown({ startDate }: { startDate: string }) {
+  const headerColor = useHeaderColor();
   const target = new Date(startDate + "T00:00:00").getTime();
   const [now, setNow] = useState(Date.now());
 
@@ -132,7 +132,7 @@ function Countdown({ startDate }: { startDate: string }) {
   const departed = diff <= 0;
 
   return (
-    <div style={{ background: STYLE.headerBg, borderRadius: 16, padding: "18px 16px", color: STYLE.headerText }}>
+    <div style={{ background: headerColor, borderRadius: 16, padding: "18px 16px", color: STYLE.headerText }}>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: 1.5, opacity: 0.7, textTransform: "uppercase", marginBottom: 10 }}>
         {departed ? "Unterwegs seit" : "Abfahrt in"}
       </div>

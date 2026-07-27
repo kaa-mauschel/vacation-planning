@@ -5,7 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT } from "@/lib/style";
+import { useHeaderColor } from "@/lib/theme";
 import { SECTIONS } from "@/lib/types";
+import { useItems } from "@/lib/useItems";
 import type { Project } from "@/lib/types";
 import Uebersicht from "@/components/Uebersicht";
 import GenericChecklist from "@/components/GenericChecklist";
@@ -42,6 +44,7 @@ export default function ProjectPage() {
   const projectId = params?.id as string;
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
+  const headerColor = useHeaderColor();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("uebersicht");
@@ -72,11 +75,23 @@ export default function ProjectPage() {
     return <div style={{ minHeight: "100vh", background: STYLE.paperDim }} />;
   }
 
+  return <ProjectPageInner project={project} tab={tab} setTab={setTab} showShare={showShare} setShowShare={setShowShare} showEdit={showEdit} setShowEdit={setShowEdit} headerColor={headerColor} router={router} loadProject={loadProject} />;
+}
+
+function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showEdit, setShowEdit, headerColor, router, loadProject }: any) {
+  const { items: routeItems } = useItems(project.id, SECTIONS.ROUTE);
+  const routeContext = routeItems
+    .slice()
+    .sort((a: any, b: any) => (a.data.date || "").localeCompare(b.data.date || ""))
+    .map((it: any) => it.data.to)
+    .filter(Boolean)
+    .join(" -> ") || [routeItems[0]?.data.from].filter(Boolean).join("");
+
   return (
     <div style={{ minHeight: "100vh", background: STYLE.paperDim, paddingBottom: 40 }}>
       <style>{FONTS_IMPORT}</style>
 
-      <div style={{ background: STYLE.headerBg, color: STYLE.headerText, padding: "20px 16px" }}>
+      <div style={{ background: headerColor, color: STYLE.headerText, padding: "20px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => router.push("/projects")} style={{ background: "none", border: "none", color: STYLE.headerText, display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: 0.75 }}>
             <ArrowLeft size={16} /> Meine Urlaube
@@ -124,13 +139,13 @@ export default function ProjectPage() {
         {tab === "unterkuenfte" && <Unterkuenfte projectId={project.id} />}
         {tab === "kosten" && <Kosten projectId={project.id} />}
         {tab === "essen" && (
-          <GenericCardList projectId={project.id} section={SECTIONS.ESSEN} groupLabel="Ort/Station" extraFieldLabel="Adresse/Kontext für Maps" />
+          <GenericCardList projectId={project.id} section={SECTIONS.ESSEN} groupLabel="Ort/Station" extraFieldLabel="Adresse/Kontext für Maps" aiKind="essen" projectName={project.name} routeContext={routeContext} />
         )}
         {tab === "aktivitaeten" && (
-          <GenericCardList projectId={project.id} section={SECTIONS.AKTIVITAET} groupLabel="Ort/Kategorie (z. B. Freibäder)" extraFieldLabel="Adresse/Kontext für Maps" />
+          <GenericCardList projectId={project.id} section={SECTIONS.AKTIVITAET} groupLabel="Ort/Kategorie (z. B. Freibäder)" extraFieldLabel="Adresse/Kontext für Maps" aiKind="aktivitaet" projectName={project.name} routeContext={routeContext} />
         )}
         {tab === "mustdo" && (
-          <GenericCardList projectId={project.id} section={SECTIONS.MUSTDO} groupLabel="Region" extraFieldLabel="Adresse/Kontext für Maps" />
+          <GenericCardList projectId={project.id} section={SECTIONS.MUSTDO} groupLabel="Region" extraFieldLabel="Adresse/Kontext für Maps" aiKind="mustdo" projectName={project.name} routeContext={routeContext} />
         )}
         {tab === "tagesplan" && <Tagesplanung projectId={project.id} />}
         {tab === "tipps" && <Tipps projectId={project.id} />}
