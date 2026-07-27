@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import type { Item } from "./types";
 
@@ -10,6 +10,10 @@ import type { Item } from "./types";
 export function useItems(projectId: string, section: string) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  // Eindeutige ID pro Hook-Nutzung, damit zwei Komponenten, die gleichzeitig dieselbe
+  // project/section abfragen (z. B. Übersicht + Route-Tab), keine Kanalnamen-Kollision
+  // bei Supabase Realtime auslösen.
+  const instanceId = useRef(Math.random().toString(36).slice(2));
 
   const reload = useCallback(async () => {
     const { data, error } = await supabase
@@ -27,7 +31,7 @@ export function useItems(projectId: string, section: string) {
     reload();
 
     const channel = supabase
-      .channel(`items-${projectId}-${section}`)
+      .channel(`items-${projectId}-${section}-${instanceId.current}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "items", filter: `project_id=eq.${projectId}` },
