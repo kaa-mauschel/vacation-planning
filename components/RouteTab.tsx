@@ -11,7 +11,7 @@ function mapsDirectionsLink(from: string, to: string) {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=driving`;
 }
 
-const EMPTY_FORM = { from: "", to: "", date: "", km: "", h: "", land: "", lat: "", lon: "" };
+const EMPTY_FORM = { from: "", fromAddress: "", to: "", toAddress: "", date: "", km: "", h: "", land: "", lat: "", lon: "" };
 
 export default function RouteTab({ projectId }: { projectId: string }) {
   const { items, loading, addItem, updateItem, deleteItem, reload } = useItems(projectId, "route");
@@ -72,13 +72,15 @@ export default function RouteTab({ projectId }: { projectId: string }) {
   };
 
   const handleCalculate = async () => {
-    if (!form.from.trim() || !form.to.trim()) {
-      setCalcError("Bitte erst \"Von\" und \"Nach\" ausfüllen (am besten mit genauer Adresse/Ort).");
+    const fromQuery = form.fromAddress.trim() || form.from.trim();
+    const toQuery = form.toAddress.trim() || form.to.trim();
+    if (!fromQuery || !toQuery) {
+      setCalcError("Bitte erst \"Von\"/\"Nach\" (oder die Adressfelder) ausfüllen.");
       return;
     }
     setCalculating(true);
     setCalcError("");
-    const result = await calculateLeg(form.from, form.to);
+    const result = await calculateLeg(fromQuery, toQuery);
     setCalculating(false);
     if (result.error) {
       setCalcError(result.error);
@@ -90,8 +92,9 @@ export default function RouteTab({ projectId }: { projectId: string }) {
   const startEdit = (it: any) => {
     setEditingId(it.id);
     setEditForm({
-      from: it.data.from || "", to: it.data.to || "", date: it.data.date || "",
-      km: it.data.km || "", h: it.data.h || "", land: it.data.land || "",
+      from: it.data.from || "", fromAddress: it.data.fromAddress || "",
+      to: it.data.to || "", toAddress: it.data.toAddress || "",
+      date: it.data.date || "", km: it.data.km || "", h: it.data.h || "", land: it.data.land || "",
       lat: it.data.lat || "", lon: it.data.lon || "",
     });
   };
@@ -163,11 +166,18 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                     <input placeholder="Von" value={editForm.from} onChange={(e) => setEditForm({ ...editForm, from: e.target.value })} style={inputStyle} />
                     <input placeholder="Nach" value={editForm.to} onChange={(e) => setEditForm({ ...editForm, to: e.target.value })} style={inputStyle} />
                   </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input placeholder="Von-Adresse (optional, genauer)" value={editForm.fromAddress} onChange={(e) => setEditForm({ ...editForm, fromAddress: e.target.value })} style={{ ...inputStyle, fontSize: 12.5 }} />
+                    <input placeholder="Nach-Adresse (optional, genauer)" value={editForm.toAddress} onChange={(e) => setEditForm({ ...editForm, toAddress: e.target.value })} style={{ ...inputStyle, fontSize: 12.5 }} />
+                  </div>
                   <button
                     onClick={async () => {
+                      const fromQuery = editForm.fromAddress.trim() || editForm.from.trim();
+                      const toQuery = editForm.toAddress.trim() || editForm.to.trim();
+                      if (!fromQuery || !toQuery) { setCalcError("Bitte erst \"Von\"/\"Nach\" (oder die Adressfelder) ausfüllen."); return; }
                       setCalculating(true);
                       setCalcError("");
-                      const result = await calculateLeg(editForm.from, editForm.to);
+                      const result = await calculateLeg(fromQuery, toQuery);
                       setCalculating(false);
                       if (result.error) { setCalcError(result.error); return; }
                       setEditForm({ ...editForm, km: result.km, h: result.h, lat: result.lat, lon: result.lon });
@@ -222,7 +232,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                   <GripVertical size={16} />
                 </div>
                 <a
-                  href={mapsDirectionsLink(it.data.from, it.data.to)}
+                  href={mapsDirectionsLink(it.data.fromAddress || it.data.from, it.data.toAddress || it.data.to)}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", textDecoration: "none", color: "inherit", gap: 8, minWidth: 0 }}
@@ -251,8 +261,12 @@ export default function RouteTab({ projectId }: { projectId: string }) {
         <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 10 }}>Etappe hinzufügen</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8 }}>
-            <input placeholder="Von (Ort oder genaue Adresse)" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} style={inputStyle} />
-            <input placeholder="Nach (Ort oder genaue Adresse)" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} style={inputStyle} />
+            <input placeholder="Von (Ort, z. B. Berlin)" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} style={inputStyle} />
+            <input placeholder="Nach (Ort)" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} style={inputStyle} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input placeholder="Von-Adresse (optional, genauer)" value={form.fromAddress} onChange={(e) => setForm({ ...form, fromAddress: e.target.value })} style={{ ...inputStyle, fontSize: 12.5 }} />
+            <input placeholder="Nach-Adresse (optional, genauer)" value={form.toAddress} onChange={(e) => setForm({ ...form, toAddress: e.target.value })} style={{ ...inputStyle, fontSize: 12.5 }} />
           </div>
           <button
             onClick={handleCalculate}
@@ -276,7 +290,9 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             <input placeholder="Längengrad (lon)" value={form.lon} onChange={(e) => setForm({ ...form, lon: e.target.value })} style={inputStyle} />
           </div>
           <p style={{ fontSize: 11.5, color: "#9A9384", margin: 0 }}>
-            Tipp: Für ein genaues Ergebnis am besten die volle Adresse eingeben (z. B. "Marienplatz 1, München"), nicht nur den Ortsnamen. Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert.
+            "Von"/"Nach" ist der Name, der überall angezeigt wird (kurz halten). Die Adressfelder sind nur für die
+            genaue Berechnung & den Google-Maps-Link – wenn leer, wird stattdessen "Von"/"Nach" verwendet.
+            Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert.
           </p>
           <button onClick={submit} style={{ padding: "10px 0", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Plus size={14} /> Etappe speichern
