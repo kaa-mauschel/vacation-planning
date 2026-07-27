@@ -126,66 +126,18 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
     setSaving(true);
     setError("");
 
-    // Diagnose: haben wir wirklich eine gültige Sitzung?
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      setSaving(false);
-      setError("Keine gültige Sitzung gefunden (Session leer). Bitte einmal abmelden und neu anmelden.");
-      return;
-    }
-
-    // Token-Inhalt zur Diagnose entschlüsseln (nur lesen, keine Prüfung nötig)
-    let tokenInfo = "";
-    try {
-      const token = sessionData.session.access_token;
-      const [rawHeader, rawPayload] = token.split(".");
-      const header = JSON.parse(atob(rawHeader.replace(/-/g, "+").replace(/_/g, "/")));
-      const payload = JSON.parse(atob(rawPayload.replace(/-/g, "+").replace(/_/g, "/")));
-      tokenInfo =
-        `Token-Header (komplett): ${JSON.stringify(header)}\n` +
-        `Token-Payload (komplett): ${JSON.stringify(payload, null, 0)}\n` +
-        `Token läuft ab: ${new Date(payload.exp * 1000).toLocaleString("de-DE")}\n` +
-        `Jetzt: ${new Date().toLocaleString("de-DE")}\n`;
-    } catch (e) {
-      tokenInfo = `Token konnte nicht gelesen werden: ${e}\n`;
-    }
-
-    const { data: project, error: insertError } = await supabase
+    // Kein .select() mehr nach dem Insert – das hat mit der RETURNING+RLS-Eigenheit
+    // von Postgres kollidiert. Die Standard-Einträge (Packliste etc.) legt jetzt
+    // ein Datenbank-Trigger automatisch an, wir brauchen die neue ID hier nicht mehr.
+    const { error: insertError } = await supabase
       .from("projects")
-      .insert({ name: name.trim(), emoji, created_by: userId })
-      .select()
-      .single();
+      .insert({ name: name.trim(), emoji, created_by: userId });
 
-    if (insertError || !project) {
+    if (insertError) {
       setSaving(false);
-      const netDebug = getLastRequestTo("/projects");
-      setError(
-        `Fehler beim Speichern:\n` +
-        `Code: ${insertError?.code || "-"}\n` +
-        `Nachricht: ${insertError?.message || "unbekannt"}\n` +
-        (insertError?.details ? `Details: ${insertError.details}\n` : "") +
-        (insertError?.hint ? `Hinweis: ${insertError.hint}\n` : "") +
-        `\nDeine Nutzer-ID (Client): ${userId}\n` +
-        tokenInfo +
-        `\n--- Tatsächlich gesendete Anfrage ---\n` +
-        (netDebug
-          ? `Methode: ${netDebug.method}\n` +
-            `URL: ${netDebug.url}\n` +
-            `Status: ${netDebug.status}\n` +
-            `Header "authorization": ${netDebug.headers["authorization"] || "❌ FEHLT KOMPLETT"}\n` +
-            `Header "apikey": ${netDebug.headers["apikey"] || "❌ FEHLT KOMPLETT"}\n` +
-            `Server-Antwort: ${netDebug.responseBody || "-"}`
-          : "Keine Anfrage erfasst (unerwartet).")
-      );
+      setError(`Fehler beim Speichern: ${insertError.message}`);
       return;
     }
-
-    const rows = [
-      ...DEFAULT_PACKLIST.map((it, i) => ({ project_id: project.id, section: SECTIONS.PACKLISTE, data: it, position: i })),
-      ...DEFAULT_VORABREISE.map((it, i) => ({ project_id: project.id, section: SECTIONS.VORABREISE, data: it, position: i })),
-      ...DEFAULT_TIPS.map((it, i) => ({ project_id: project.id, section: SECTIONS.TIPP, data: it, position: i })),
-    ];
-    if (rows.length) await supabase.from("items").insert(rows);
 
     setSaving(false);
     onCreated();
