@@ -13,7 +13,7 @@ function mapsDirectionsLink(from: string, to: string) {
 const EMPTY_FORM = { from: "", to: "", date: "", km: "", h: "", land: "", lat: "", lon: "" };
 
 export default function RouteTab({ projectId }: { projectId: string }) {
-  const { items, loading, addItem, updateItem, deleteItem } = useItems(projectId, "route");
+  const { items, loading, addItem, updateItem, deleteItem, reload } = useItems(projectId, "route");
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
@@ -48,6 +48,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     for (let i = 0; i < orderedIds.length; i++) {
       await supabase.from("items").update({ position: i }).eq("id", orderedIds[i]);
     }
+    await reload();
   };
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
@@ -92,6 +93,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
       supabaseUpdatePosition(idA, posB),
       supabaseUpdatePosition(idB, posA),
     ]);
+    await reload(); // sofort sichtbar, nicht erst auf Realtime warten
   };
 
   const supabaseUpdatePosition = async (id: string, position: number) => {
