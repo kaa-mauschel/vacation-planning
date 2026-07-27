@@ -1,15 +1,19 @@
 import type { CSSProperties } from "react";
 
 export const STYLE = {
-  ink: "#20302B",
-  paper: "#FBF7EE",
-  paperDim: "#F1EADA",
-  accent: "#3E6E52",
-  accent2: "#C1793B",
-  accent3: "#77689A",
-  accent4: "#2A6E8C",
-  warn: "#8A5A1E",
-  danger: "#D96C6C",
+  ink: "#3A3530",              // dunkler Text (statt tiefschwarz-grün)
+  paper: "#FFFDF9",
+  paperDim: "#F6F1E7",
+  accent: "#5B9279",           // Salbeigrün
+  accent2: "#E0A45C",          // sanftes Apricot
+  accent3: "#9584B8",          // Pastelllila
+  accent4: "#5FA3AE",          // Pastellblau/Türkis
+  warn: "#C98A3E",
+  danger: "#D97878",
+  // Pastellfarbene Kopfzeilen/Akzentflächen (dunkler Text statt weißer Text)
+  headerBg: "#CBE7DD",         // pastelliges Minzgrün
+  headerBg2: "#F4D9C6",        // pastelliges Apricot (z. B. für Login)
+  headerText: "#3A3530",
 };
 
 export const FONTS_IMPORT =
@@ -19,5 +23,5 @@ export const cardStyle: CSSProperties = {
   background: STYLE.paper,
   borderRadius: 16,
   padding: 16,
-  boxShadow: "0 1px 2px rgba(32,48,43,0.06)",
+  boxShadow: "0 1px 2px rgba(58,53,48,0.07)",
 };

@@ -5,6 +5,7 @@ export type Project = {
   created_by: string;
   invite_code: string;
   created_at: string;
+  start_date: string | null;
 };
 
 export type Item = {
@@ -29,4 +30,20 @@ export const SECTIONS = {
   MUSTDO: "mustdo",
   TAGESPLAN: "tagesplan",
   TIPP: "tipp",
+  NOTIZ: "notiz",
 } as const;
+
+// Land -> Flagge, für die Routen-Übersicht (einfache Zuordnung, erweiterbar)
+export const COUNTRY_FLAGS: Record<string, string> = {
+  "deutschland": "🇩🇪", "österreich": "🇦🇹", "schweiz": "🇨🇭", "italien": "🇮🇹",
+  "frankreich": "🇫🇷", "spanien": "🇪🇸", "portugal": "🇵🇹", "niederlande": "🇳🇱",
+  "belgien": "🇧🇪", "polen": "🇵🇱", "tschechien": "🇨🇿", "kroatien": "🇭🇷",
+  "griechenland": "🇬🇷", "türkei": "🇹🇷", "dänemark": "🇩🇰", "schweden": "🇸🇪",
+  "norwegen": "🇳🇴", "finnland": "🇫🇮", "ungarn": "🇭🇺", "slowenien": "🇸🇮",
+  "usa": "🇺🇸", "kanada": "🇨🇦", "mexiko": "🇲🇽", "japan": "🇯🇵", "thailand": "🇹🇭",
+  "vereinigtes königreich": "🇬🇧", "irland": "🇮🇪", "island": "🇮🇸",
+};
+
+export function guessFlag(country: string): string {
+  return COUNTRY_FLAGS[country.trim().toLowerCase()] || "🌍";
+}

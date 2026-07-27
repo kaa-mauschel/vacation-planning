@@ -17,12 +17,16 @@ export default function Tagesplanung({ projectId }: { projectId: string }) {
     setNewDate("");
   };
 
+  const sorted = [...items].sort((a, b) => (a.data.date || "").localeCompare(b.data.date || ""));
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {items.map((it) => (
+      {sorted.map((it) => (
         <div key={it.id} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 13 }}>{it.data.date}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 13 }}>
+              {it.data.date ? new Date(it.data.date).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" }) : ""}
+            </span>
             <button onClick={() => deleteItem(it.id)} style={{ background: "none", border: "none", color: "#B8AF9C" }}><X size={15} /></button>
           </div>
           <textarea
@@ -37,10 +41,9 @@ export default function Tagesplanung({ projectId }: { projectId: string }) {
 
       <div style={{ ...cardStyle, display: "flex", gap: 8 }}>
         <input
-          placeholder="Datum (z. B. 12. August)"
+          type="date"
           value={newDate}
           onChange={(e) => setNewDate(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") addDay(); }}
           style={{ flex: 1, padding: "9px 11px", borderRadius: 9, border: "1px solid #E0D9C6", fontSize: 13.5, minWidth: 0 }}
         />
         <button onClick={addDay} style={{ padding: "0 16px", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>

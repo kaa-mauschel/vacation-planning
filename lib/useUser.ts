@@ -9,13 +9,17 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
+    // getSession() liest die gespeicherte Sitzung lokal (kein Netzwerk nötig) –
+    // dadurch bleibst du auch bei schlechter Verbindung eingeloggt, statt bei
+    // jedem App-Start neu einloggen zu müssen.
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => listener.subscription.unsubscribe();

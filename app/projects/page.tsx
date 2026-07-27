@@ -5,13 +5,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT, cardStyle } from "@/lib/style";
-import { DEFAULT_PACKLIST, DEFAULT_VORABREISE, DEFAULT_TIPS } from "@/lib/defaultData";
-import { SECTIONS } from "@/lib/types";
 import type { Project } from "@/lib/types";
 import { Plus, LogOut, Users, X, Luggage } from "lucide-react";
-import { patchFetchForDebug, getLastRequestTo } from "@/lib/networkDebug";
 
-const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒"];
+const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒", "🚗", "✈️"];
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -20,10 +17,6 @@ export default function ProjectsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
-
-  useEffect(() => {
-    patchFetchForDebug();
-  }, []);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -52,13 +45,13 @@ export default function ProjectsPage() {
     <div style={{ minHeight: "100vh", background: STYLE.paperDim }}>
       <style>{FONTS_IMPORT}</style>
 
-      <div style={{ background: STYLE.ink, color: STYLE.paper, padding: "24px 20px" }}>
+      <div style={{ background: STYLE.headerBg, color: STYLE.headerText, padding: "24px 20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Luggage size={22} />
             <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22 }}>Urlaubsplaner</span>
           </div>
-          <button onClick={handleLogout} style={{ background: "none", border: "none", color: STYLE.paper, opacity: 0.75, display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+          <button onClick={handleLogout} style={{ background: "none", border: "none", color: STYLE.headerText, opacity: 0.7, display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
             <LogOut size={15} /> Abmelden
           </button>
         </div>
@@ -99,7 +92,9 @@ export default function ProjectsPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 15.5 }}>{p.name}</div>
                   <div style={{ fontSize: 12, color: "#9A9384", marginTop: 2 }}>
-                    Angelegt am {new Date(p.created_at).toLocaleDateString("de-DE")}
+                    {p.start_date
+                      ? `Start: ${new Date(p.start_date).toLocaleDateString("de-DE")}`
+                      : `Angelegt am ${new Date(p.created_at).toLocaleDateString("de-DE")}`}
                   </div>
                 </div>
               </button>
@@ -110,7 +105,6 @@ export default function ProjectsPage() {
 
       {showNew && <NewProjectModal onClose={() => setShowNew(false)} onCreated={loadProjects} userId={user.id} />}
       {showJoin && <JoinProjectModal onClose={() => setShowJoin(false)} onJoined={loadProjects} />}
-      <WhoAmITest />
     </div>
   );
 }
@@ -118,6 +112,7 @@ export default function ProjectsPage() {
 function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; onCreated: () => void; userId: string }) {
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(EMOJIS[0]);
+  const [startDate, setStartDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -126,12 +121,9 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
     setSaving(true);
     setError("");
 
-    // Kein .select() mehr nach dem Insert – das hat mit der RETURNING+RLS-Eigenheit
-    // von Postgres kollidiert. Die Standard-Einträge (Packliste etc.) legt jetzt
-    // ein Datenbank-Trigger automatisch an, wir brauchen die neue ID hier nicht mehr.
     const { error: insertError } = await supabase
       .from("projects")
-      .insert({ name: name.trim(), emoji, created_by: userId });
+      .insert({ name: name.trim(), emoji, created_by: userId, start_date: startDate || null });
 
     if (insertError) {
       setSaving(false);
@@ -153,6 +145,13 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
         placeholder="z. B. Sommerurlaub 2027"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginTop: 6, marginBottom: 14 }}
+      />
+      <label style={{ fontSize: 13, fontWeight: 600 }}>Abfahrtsdatum (optional, für den Countdown)</label>
+      <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
         style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginTop: 6, marginBottom: 14 }}
       />
       <label style={{ fontSize: 13, fontWeight: 600 }}>Symbol</label>
@@ -220,34 +219,6 @@ function JoinProjectModal({ onClose, onJoined }: { onClose: () => void; onJoined
         {saving ? "Trete bei…" : "Beitreten"}
       </button>
     </ModalShell>
-  );
-}
-
-function WhoAmITest() {
-  const [result, setResult] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const run = async () => {
-    setLoading(true);
-    setResult("");
-    const { data, error } = await supabase.rpc("debug_whoami");
-    setLoading(false);
-    setResult(error ? `Fehler: ${error.message}` : JSON.stringify(data, null, 2));
-  };
-
-  return (
-    <div style={{ marginTop: 30, padding: 16, background: "#F1EADA", borderRadius: 12, fontSize: 12.5 }}>
-      <button
-        onClick={run}
-        disabled={loading}
-        style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #C9C2B0", background: "#fff", fontSize: 13, fontWeight: 600 }}
-      >
-        {loading ? "Teste…" : "🔍 Auth-Diagnose-Test ausführen"}
-      </button>
-      {result && (
-        <pre style={{ marginTop: 10, whiteSpace: "pre-wrap", background: "#fff", padding: 10, borderRadius: 8 }}>{result}</pre>
-      )}
-    </div>
   );
 }
 

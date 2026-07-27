@@ -78,8 +78,8 @@ export default function LoginPage() {
       <style>{FONTS_IMPORT}</style>
       <div style={{ width: "100%", maxWidth: 380, background: STYLE.paper, borderRadius: 20, padding: 28, boxShadow: "0 4px 20px rgba(32,48,43,0.1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: STYLE.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Luggage size={20} color={STYLE.paper} />
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: STYLE.headerBg2, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Luggage size={20} color={STYLE.ink} />
           </div>
           <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22 }}>Urlaubsplaner</span>
         </div>

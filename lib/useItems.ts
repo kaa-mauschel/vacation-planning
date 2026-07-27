@@ -6,6 +6,7 @@ import type { Item } from "./types";
 
 // Lädt alle Items einer Section eines Projekts und hält sie live synchron:
 // Wenn ein Mitreisender etwas ändert, aktualisiert sich die Liste bei dir automatisch.
+// Neue Einträge landen ganz oben (neueste zuerst).
 export function useItems(projectId: string, section: string) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +18,7 @@ export function useItems(projectId: string, section: string) {
       .eq("project_id", projectId)
       .eq("section", section)
       .order("position", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false });
     if (!error && data) setItems(data as Item[]);
     setLoading(false);
   }, [projectId, section]);
@@ -53,14 +54,17 @@ export function useItems(projectId: string, section: string) {
       position,
       created_by: userData?.user?.id ?? null,
     });
+    await reload(); // sofort aktualisieren, nicht nur auf Realtime warten
   };
 
   const updateItem = async (id: string, data: Record<string, any>) => {
     await supabase.from("items").update({ data }).eq("id", id);
+    await reload();
   };
 
   const deleteItem = async (id: string) => {
     await supabase.from("items").delete().eq("id", id);
+    await reload();
   };
 
   return { items, loading, addItem, updateItem, deleteItem, reload };
