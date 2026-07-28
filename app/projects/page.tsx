@@ -7,7 +7,7 @@ import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT, cardStyle } from "@/lib/style";
 import { useHeaderColor } from "@/lib/theme";
 import type { Project } from "@/lib/types";
-import { Plus, LogOut, Users, X, Luggage, Settings, CalendarDays } from "lucide-react";
+import { Plus, LogOut, Users, X, Luggage, Settings, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 
 const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒", "🚗", "✈️"];
 
@@ -36,6 +36,7 @@ export default function ProjectsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [showPast, setShowPast] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -44,7 +45,6 @@ export default function ProjectsPage() {
   const loadProjects = async () => {
     const { data } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
     const list = (data as Project[]) || [];
-    // Sortierung: erst nach Startdatum (bevorstehende/laufende zuerst), Projekte ohne Datum ans Ende
     list.sort((a, b) => {
       if (a.start_date && b.start_date) return a.start_date.localeCompare(b.start_date);
       if (a.start_date) return -1;
@@ -67,6 +67,11 @@ export default function ProjectsPage() {
   if (loading || !user) {
     return <div style={{ minHeight: "100vh", background: STYLE.paperDim }} />;
   }
+
+  const isPast = (p: Project) => getStatus(p.start_date, p.end_date).label === "Vorbei";
+  const upcoming = projects.filter((p) => !isPast(p));
+  const past = projects.filter(isPast);
+  const nextTrip = upcoming.find((p) => p.start_date && getStatus(p.start_date, p.end_date).label !== "Läuft gerade");
 
   return (
     <div style={{ minHeight: "100vh", background: STYLE.paperDim }}>
@@ -113,45 +118,115 @@ export default function ProjectsPage() {
             <p style={{ fontSize: 14, color: "#6B6558" }}>Noch keine Urlaube angelegt. Leg deinen ersten mit "Neuer Urlaub" an!</p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {projects.map((p) => {
-              const status = getStatus(p.start_date, p.end_date);
-              const dur = p.start_date && p.end_date ? daysBetween(p.start_date, p.end_date) : null;
-              return (
+          <>
+            {nextTrip && <NextTripCountdown project={nextTrip} onClick={() => router.push(`/projects/${nextTrip.id}`)} />}
+
+            {upcoming.length === 0 ? (
+              <div style={{ ...cardStyle, textAlign: "center", padding: 24, marginTop: 14 }}>
+                <p style={{ fontSize: 14, color: "#6B6558" }}>Keine bevorstehenden Urlaube.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: nextTrip ? 14 : 0 }}>
+                {upcoming.map((p) => (
+                  <ProjectCard key={p.id} project={p} highlighted={p.id === nextTrip?.id} onClick={() => router.push(`/projects/${p.id}`)} />
+                ))}
+              </div>
+            )}
+
+            {past.length > 0 && (
+              <div style={{ marginTop: 20 }}>
                 <button
-                  key={p.id}
-                  onClick={() => router.push(`/projects/${p.id}`)}
-                  style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 14, textAlign: "left", border: "none", width: "100%" }}
+                  onClick={() => setShowPast(!showPast)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#9A9384", fontSize: 13, fontWeight: 600, padding: "6px 0" }}
                 >
-                  <div style={{ fontSize: 28, flexShrink: 0 }}>{p.emoji}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <div style={{ fontWeight: 700, fontSize: 15.5 }}>{p.name}</div>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: status.bg, color: status.color, flexShrink: 0 }}>
-                        {status.label}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#9A9384", marginTop: 3, display: "flex", alignItems: "center", gap: 5 }}>
-                      <CalendarDays size={12} />
-                      {p.start_date && p.end_date ? (
-                        <span>{fmtDate(p.start_date)} – {fmtDate(p.end_date)} · {dur} {dur === 1 ? "Tag" : "Tage"}</span>
-                      ) : p.start_date ? (
-                        <span>ab {fmtDate(p.start_date)}</span>
-                      ) : (
-                        <span>Angelegt am {new Date(p.created_at).toLocaleDateString("de-DE")}</span>
-                      )}
-                    </div>
-                  </div>
+                  {showPast ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  Vergangene Urlaube ({past.length})
                 </button>
-              );
-            })}
-          </div>
+                {showPast && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                    {past.map((p) => (
+                      <ProjectCard key={p.id} project={p} onClick={() => router.push(`/projects/${p.id}`)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {showNew && <NewProjectModal onClose={() => setShowNew(false)} onCreated={loadProjects} userId={user.id} />}
       {showJoin && <JoinProjectModal onClose={() => setShowJoin(false)} onJoined={loadProjects} />}
     </div>
+  );
+}
+
+function ProjectCard({ project: p, onClick, highlighted }: { project: Project; onClick: () => void; highlighted?: boolean }) {
+  const status = getStatus(p.start_date, p.end_date);
+  const dur = p.start_date && p.end_date ? daysBetween(p.start_date, p.end_date) : null;
+  return (
+    <button
+      onClick={onClick}
+      style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 14, textAlign: "left", border: highlighted ? `1.5px solid ${STYLE.accent}` : "none", width: "100%", opacity: status.label === "Vorbei" ? 0.75 : 1 }}
+    >
+      <div style={{ fontSize: 28, flexShrink: 0 }}>{p.emoji}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 700, fontSize: 15.5 }}>{p.name}</div>
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: status.bg, color: status.color, flexShrink: 0 }}>
+            {status.label}
+          </span>
+        </div>
+        <div style={{ fontSize: 12, color: "#9A9384", marginTop: 3, display: "flex", alignItems: "center", gap: 5 }}>
+          <CalendarDays size={12} />
+          {p.start_date && p.end_date ? (
+            <span>{fmtDate(p.start_date)} – {fmtDate(p.end_date)} · {dur} {dur === 1 ? "Tag" : "Tage"}</span>
+          ) : p.start_date ? (
+            <span>ab {fmtDate(p.start_date)}</span>
+          ) : (
+            <span>Angelegt am {new Date(p.created_at).toLocaleDateString("de-DE")}</span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function NextTripCountdown({ project, onClick }: { project: Project; onClick: () => void }) {
+  const headerColor = useHeaderColor();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!project.start_date) return null;
+  const target = new Date(project.start_date + "T00:00:00").getTime();
+  const diff = Math.max(0, target - now);
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((diff / (1000 * 60)) % 60);
+  const seconds = Math.floor((diff / 1000) % 60);
+
+  return (
+    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: headerColor, border: "none", borderRadius: 16, padding: "16px 18px", color: STYLE.headerText }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 20 }}>{project.emoji}</span>
+        <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{project.name}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "rgba(255,255,255,0.55)" }}>
+          Nächster Urlaub
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: 16 }}>
+        {[["Tage", days], ["Std.", hours], ["Min.", minutes], ["Sek.", seconds]].map(([label, val]) => (
+          <div key={label as string}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, lineHeight: 1 }}>{String(val).padStart(2, "0")}</div>
+            <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+    </button>
   );
 }
 
