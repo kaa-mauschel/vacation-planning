@@ -1,11 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { Plus, X, Pencil } from "lucide-react";
 
-const KATEGORIEN = ["Unterkunft", "Essen", "Aktivität", "Tanken", "Transport", "Einkauf", "Sonstiges"];
+const KostenChart = dynamic(() => import("./KostenChart"), { ssr: false, loading: () => <div style={{ height: 240 }} /> });
+
+const KATEGORIEN = [
+  { name: "Unterkunft", icon: "🏠" },
+  { name: "Essen", icon: "🍽️" },
+  { name: "Aktivität", icon: "🎢" },
+  { name: "Tanken", icon: "⛽" },
+  { name: "Transport", icon: "🚌" },
+  { name: "Einkauf", icon: "🛒" },
+  { name: "Sonstiges", icon: "📦" },
+];
+const iconFor = (kat: string) => KATEGORIEN.find((k) => k.name === kat)?.icon || "📦";
+
 const EMPTY = { kategorie: "", betrag: "", ort: "" };
 
 export default function Kosten({ projectId }: { projectId: string }) {
@@ -14,11 +27,13 @@ export default function Kosten({ projectId }: { projectId: string }) {
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY);
+  const [filterOrt, setFilterOrt] = useState("");
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
-  const total = items.reduce((sum, it) => sum + (Number(it.data.betrag) || 0), 0);
   const orte = Array.from(new Set(unterkuenfte.map((it) => it.data.station).filter(Boolean)));
+  const filteredItems = filterOrt ? items.filter((it) => it.data.ort === filterOrt) : items;
+  const total = filteredItems.reduce((sum, it) => sum + (Number(it.data.betrag) || 0), 0);
 
   const submit = () => {
     if (!form.kategorie.trim() || !form.betrag) return;
@@ -36,23 +51,24 @@ export default function Kosten({ projectId }: { projectId: string }) {
     setEditingId(null);
   };
 
-  const byKategorie = KATEGORIEN.filter((k) => items.some((it) => it.data.kategorie === k))
-    .concat(Array.from(new Set(items.map((it) => it.data.kategorie).filter((k) => !KATEGORIEN.includes(k)))));
+  const byKategorie = KATEGORIEN.map((k) => k.name).filter((k) => filteredItems.some((it) => it.data.kategorie === k))
+    .concat(Array.from(new Set(filteredItems.map((it) => it.data.kategorie).filter((k) => !KATEGORIEN.some((kk) => kk.name === k)))));
 
   const CategoryPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       {KATEGORIEN.map((k) => (
         <button
-          key={k}
+          key={k.name}
           type="button"
-          onClick={() => onChange(k)}
+          onClick={() => onChange(k.name)}
           style={{
+            display: "flex", alignItems: "center", gap: 5,
             padding: "6px 11px", borderRadius: 20, fontSize: 12.5, fontWeight: 600,
-            border: value === k ? `1.5px solid ${STYLE.accent}` : "1px solid #E0D9C6",
-            background: value === k ? "#E4EFE7" : "#fff", color: value === k ? STYLE.accent : STYLE.ink,
+            border: value === k.name ? `1.5px solid ${STYLE.accent}` : "1px solid #E0D9C6",
+            background: value === k.name ? "#E4EFE7" : "#fff", color: value === k.name ? STYLE.accent : STYLE.ink,
           }}
         >
-          {k}
+          <span>{k.icon}</span> {k.name}
         </button>
       ))}
     </div>
@@ -69,19 +85,38 @@ export default function Kosten({ projectId }: { projectId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
-        <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>Gesamtkosten</span>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 600, marginTop: 8 }}>
-          {total.toLocaleString("de-DE")} €
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>
+              {filterOrt ? `Kosten – ${filterOrt}` : "Gesamtkosten"}
+            </span>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 600, marginTop: 8 }}>
+              {total.toLocaleString("de-DE")} €
+            </div>
+          </div>
         </div>
+        {orte.length > 0 && (
+          <select value={filterOrt} onChange={(e) => setFilterOrt(e.target.value)} style={{ ...inputStyle, marginTop: 12 }}>
+            <option value="">Alle Unterkünfte</option>
+            {orte.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
       </div>
 
+      {items.length > 0 && orte.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 10 }}>Kosten nach Unterkunft & Art</div>
+          <KostenChart items={items} orte={orte} kategorien={KATEGORIEN.map((k) => k.name)} />
+        </div>
+      )}
+
       {byKategorie.map((kat) => {
-        const katItems = items.filter((it) => it.data.kategorie === kat);
+        const katItems = filteredItems.filter((it) => it.data.kategorie === kat);
         const katTotal = katItems.reduce((sum, it) => sum + (Number(it.data.betrag) || 0), 0);
         return (
           <div key={kat} style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14.5 }}>{kat}</span>
+              <span style={{ fontWeight: 700, fontSize: 14.5 }}>{iconFor(kat)} {kat}</span>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "#6B6558" }}>{katTotal.toLocaleString("de-DE")} €</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

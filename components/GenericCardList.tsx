@@ -13,7 +13,7 @@ function mapsSearchLink(name: string, context: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${context}`)}`;
 }
 
-const EMPTY_FORM = { name: "", type: "", group: "", note: "", context: "", rating: "", unterkunftId: "", unterkunftName: "", distance: "" };
+const EMPTY_FORM = { name: "", type: "", group: "", note: "", context: "", rating: "", unterkunftId: "", unterkunftName: "", routeId: "", routeName: "", distance: "" };
 
 export default function GenericCardList({
   projectId,
@@ -34,6 +34,7 @@ export default function GenericCardList({
 }) {
   const { items, loading, addItem, updateItem, deleteItem } = useItems(projectId, section);
   const { items: unterkuenfte } = useItems(projectId, SECTIONS.UNTERKUNFT);
+  const { items: routeItems } = useItems(projectId, SECTIONS.ROUTE);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
@@ -45,27 +46,43 @@ export default function GenericCardList({
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
-  // Gruppierung: Einträge mit verknüpfter Unterkunft werden nach Land + Unterkunft
-  // gruppiert und chronologisch nach Anreisedatum sortiert. Einträge ohne Verknüpfung
+  // Gruppierung: Einträge mit verknüpfter Unterkunft oder Route-Etappe werden nach
+  // Land + Ort gruppiert und chronologisch sortiert. Einträge ohne Verknüpfung
   // behalten das freie "group"-Textfeld als Gruppe (unsortiert, danach angehängt).
   const groupKeyOf = (it: any) => {
-    const acc = it.data.unterkunftId ? unterkuenfte.find((a) => a.id === it.data.unterkunftId) : null;
-    return acc ? `acc:${acc.id}` : `grp:${it.data.group || "Allgemein"}`;
+    if (it.data.unterkunftId) return `acc:${it.data.unterkunftId}`;
+    if (it.data.routeId) return `route:${it.data.routeId}`;
+    return `grp:${it.data.group || "Allgemein"}`;
   };
   const groupLabelOf = (it: any) => {
-    const acc = it.data.unterkunftId ? unterkuenfte.find((a) => a.id === it.data.unterkunftId) : null;
-    if (acc) {
-      const country = acc.data.country || "";
-      const flag = country ? guessFlag(country) : "";
-      return `${flag} ${country || "Unbekanntes Land"} (${acc.data.station})`.trim();
+    if (it.data.unterkunftId) {
+      const acc = unterkuenfte.find((a) => a.id === it.data.unterkunftId);
+      if (acc) {
+        const country = acc.data.country || "";
+        const flag = country ? guessFlag(country) : "";
+        return `${flag} ${country || "Unbekanntes Land"} (${acc.data.station})`.trim();
+      }
+    }
+    if (it.data.routeId) {
+      const leg = routeItems.find((r) => r.id === it.data.routeId);
+      if (leg) {
+        const country = leg.data.fromCountry || leg.data.land || "";
+        const flag = country ? guessFlag(country) : "";
+        return `${flag} ${country || "Unbekanntes Land"} (${leg.data.from})`.trim();
+      }
     }
     return it.data.group || "Allgemein";
   };
   const groupSortDateOf = (key: string) => {
-    if (!key.startsWith("acc:")) return null;
-    const accId = key.slice(4);
-    const acc = unterkuenfte.find((a) => a.id === accId);
-    return acc?.data.von || null;
+    if (key.startsWith("acc:")) {
+      const acc = unterkuenfte.find((a) => a.id === key.slice(4));
+      return acc?.data.von || null;
+    }
+    if (key.startsWith("route:")) {
+      const leg = routeItems.find((r) => r.id === key.slice(6));
+      return leg?.data.date || null;
+    }
+    return null;
   };
 
   const groupMeta: Record<string, { label: string; sortDate: string | null }> = {};
@@ -86,7 +103,8 @@ export default function GenericCardList({
     setEditForm({
       name: it.data.name || "", type: it.data.type || "", group: it.data.group || "",
       note: it.data.note || "", context: it.data.context || "", rating: it.data.rating || "",
-      unterkunftId: it.data.unterkunftId || "", unterkunftName: it.data.unterkunftName || "", distance: it.data.distance || "",
+      unterkunftId: it.data.unterkunftId || "", unterkunftName: it.data.unterkunftName || "",
+      routeId: it.data.routeId || "", routeName: it.data.routeName || "", distance: it.data.distance || "",
     });
   };
 
@@ -143,6 +161,7 @@ export default function GenericCardList({
           groupLabel={groupLabel}
           extraFieldLabel={extraFieldLabel}
           accommodations={unterkuenfte}
+          routeItems={routeItems}
           onCancel={() => setShowForm(false)}
           onSave={async (data) => { await addItem(data); setShowForm(false); }}
         />
@@ -179,6 +198,7 @@ export default function GenericCardList({
                       groupLabel={groupLabel}
                       extraFieldLabel={extraFieldLabel}
                       accommodations={unterkuenfte}
+          routeItems={routeItems}
                       onChange={setEditForm}
                       onCancel={() => setEditingId(null)}
                       onSave={() => saveEdit(it)}
@@ -211,11 +231,16 @@ export default function GenericCardList({
                       </div>
                     </div>
                     {it.data.note && <p style={{ fontSize: 13.5, color: "#4A453C", lineHeight: 1.55, margin: "8px 0 0" }}>{it.data.note}</p>}
-                    {(it.data.unterkunftName || it.data.distance) && (
+                    {(it.data.unterkunftName || it.data.routeName || it.data.distance) && (
                       <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
                         {it.data.unterkunftName && (
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 9px", borderRadius: 20, background: "#EFEADC", color: "#6B6558", fontWeight: 600 }}>
                             <Home size={11} /> {it.data.unterkunftName}
+                          </span>
+                        )}
+                        {it.data.routeName && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 9px", borderRadius: 20, background: "#EFEADC", color: "#6B6558", fontWeight: 600 }}>
+                            <MapPin size={11} /> {it.data.routeName}
                           </span>
                         )}
                         {it.data.distance && (
@@ -253,6 +278,7 @@ function CardForm({
   groupLabel,
   extraFieldLabel,
   accommodations,
+  routeItems,
 }: {
   form: typeof EMPTY_FORM;
   onChange?: (f: typeof EMPTY_FORM) => void;
@@ -261,6 +287,7 @@ function CardForm({
   groupLabel: string;
   extraFieldLabel: string;
   accommodations: any[];
+  routeItems: any[];
 }) {
   const [local, setLocal] = useState(form);
   const [calculating, setCalculating] = useState(false);
@@ -271,17 +298,21 @@ function CardForm({
   };
 
   const selectedAccommodation = accommodations.find((a) => a.id === local.unterkunftId);
+  const selectedRoute = routeItems.find((r) => r.id === local.routeId);
+  const targetLat = selectedAccommodation?.data.lat || selectedRoute?.data.lat;
+  const targetLon = selectedAccommodation?.data.lon || selectedRoute?.data.lon;
+  const hasLocation = !!(local.unterkunftId || local.routeId);
 
   const handleCalculateDistance = async () => {
-    if (!selectedAccommodation?.data.lat || !selectedAccommodation?.data.lon) {
-      setCalcError("Diese Unterkunft hat noch keine Koordinaten (im Tab Unterkünfte berechnen lassen).");
+    if (!targetLat || !targetLon) {
+      setCalcError("Für diesen Ort liegen noch keine Koordinaten vor (im jeweiligen Tab berechnen lassen).");
       return;
     }
     const query = local.context.trim() || local.name.trim();
     if (!query) { setCalcError("Bitte erst Name oder Ort/Kontext ausfüllen."); return; }
     setCalculating(true);
     setCalcError("");
-    const result = await calculateDistanceTo(query, parseFloat(selectedAccommodation.data.lat), parseFloat(selectedAccommodation.data.lon));
+    const result = await calculateDistanceTo(query, parseFloat(targetLat), parseFloat(targetLon));
     setCalculating(false);
     if (result.error) { setCalcError(result.error); return; }
     set({ ...local, distance: result.km });
@@ -297,22 +328,41 @@ function CardForm({
         <input placeholder="Bewertung (z. B. 4.8, optional)" value={local.rating} onChange={(e) => set({ ...local, rating: e.target.value })} style={inputStyle} />
         <textarea placeholder="Notiz (optional)" value={local.note} onChange={(e) => set({ ...local, note: e.target.value })} rows={2} style={inputStyle} />
 
-        {accommodations.length > 0 && (
+        {(accommodations.length > 0 || routeItems.length > 0) && (
           <>
             <select
-              value={local.unterkunftId}
+              value={local.unterkunftId ? `acc:${local.unterkunftId}` : local.routeId ? `route:${local.routeId}` : ""}
               onChange={(e) => {
-                const acc = accommodations.find((a) => a.id === e.target.value);
-                set({ ...local, unterkunftId: e.target.value, unterkunftName: acc?.data.station || "", distance: "" });
+                const val = e.target.value;
+                if (val.startsWith("acc:")) {
+                  const acc = accommodations.find((a) => a.id === val.slice(4));
+                  set({ ...local, unterkunftId: val.slice(4), unterkunftName: acc?.data.station || "", routeId: "", routeName: "", distance: "" });
+                } else if (val.startsWith("route:")) {
+                  const leg = routeItems.find((r) => r.id === val.slice(6));
+                  set({ ...local, routeId: val.slice(6), routeName: leg?.data.from || "", unterkunftId: "", unterkunftName: "", distance: "" });
+                } else {
+                  set({ ...local, unterkunftId: "", unterkunftName: "", routeId: "", routeName: "", distance: "" });
+                }
               }}
               style={inputStyle}
             >
-              <option value="">Zugehörige Unterkunft (optional)</option>
-              {accommodations.map((a) => (
-                <option key={a.id} value={a.id}>{a.data.station}</option>
-              ))}
+              <option value="">Zugehöriger Ort (optional)</option>
+              {accommodations.length > 0 && (
+                <optgroup label="Unterkünfte">
+                  {accommodations.map((a) => (
+                    <option key={a.id} value={`acc:${a.id}`}>{a.data.station}</option>
+                  ))}
+                </optgroup>
+              )}
+              {routeItems.length > 0 && (
+                <optgroup label="Etappen aus der Route">
+                  {routeItems.map((r) => (
+                    <option key={r.id} value={`route:${r.id}`}>{r.data.from}{r.data.to ? ` → ${r.data.to}` : ""}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
-            {local.unterkunftId && (
+            {hasLocation && (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button
                   type="button"
@@ -321,7 +371,7 @@ function CardForm({
                   style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: `1px solid ${STYLE.accent4}`, background: "transparent", color: STYLE.accent4, fontSize: 12.5, fontWeight: 600, opacity: calculating ? 0.6 : 1 }}
                 >
                   {calculating ? <Loader2 size={13} className="animate-spin" /> : <Ruler size={13} />}
-                  {calculating ? "Berechne…" : "Entfernung zur Unterkunft berechnen"}
+                  {calculating ? "Berechne…" : "Entfernung berechnen"}
                 </button>
                 {local.distance && <span style={{ fontSize: 12.5, fontWeight: 600, color: STYLE.accent, flexShrink: 0 }}>{local.distance}</span>}
               </div>

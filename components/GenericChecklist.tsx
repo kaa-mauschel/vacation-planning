@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
-import { Check, Plus, Pencil, X, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Check, Plus, Pencil, X, ChevronDown, ChevronUp } from "lucide-react";
+import { personStyle } from "@/lib/personStyle";
 
 const ALLGEMEIN = "Allgemein";
 
@@ -78,15 +79,16 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
         const categories = Array.from(new Set(ownerItems.map((it) => it.data.category || "Sonstiges")));
         const ownerCollapsed = !!collapsedOwners[owner];
         const ownerDone = ownerItems.filter((it) => it.data.checked).length;
+        const style = personStyle(owner);
 
         return (
-          <div key={owner} style={{ ...cardStyle, background: owner === ALLGEMEIN ? STYLE.paper : "#F3F0E5" }}>
+          <div key={owner} style={{ ...cardStyle, background: owner === ALLGEMEIN ? STYLE.paper : "#F3F0E5", borderLeft: owner !== ALLGEMEIN ? `4px solid ${style.color}` : "none" }}>
             <button
               onClick={() => setCollapsedOwners({ ...collapsedOwners, [owner]: !ownerCollapsed })}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer" }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16.5 }}>
-                {owner !== ALLGEMEIN && <User size={14} color={STYLE.accent3} />} {owner}
+              <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16.5, color: owner !== ALLGEMEIN ? style.color : STYLE.ink }}>
+                <span>{style.emoji}</span> {owner}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#9A9384" }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{ownerDone}/{ownerItems.length}</span>
@@ -199,9 +201,9 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
                   key={o}
                   type="button"
                   onClick={() => setNewOwner(o)}
-                  style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, border: newOwner === o ? `1.5px solid ${STYLE.accent}` : "1px solid #E0D9C6", background: newOwner === o ? "#E4EFE7" : "#fff" }}
+                  style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, border: newOwner === o ? `1.5px solid ${personStyle(o).color}` : "1px solid #E0D9C6", background: newOwner === o ? "#E4EFE7" : "#fff" }}
                 >
-                  {o}
+                  {personStyle(o).emoji} {o}
                 </button>
               ))}
               <button
