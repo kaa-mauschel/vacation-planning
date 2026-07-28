@@ -6,6 +6,7 @@ import { STYLE, cardStyle } from "@/lib/style";
 import { getAiSuggestions } from "@/lib/aiSuggestions";
 import { calculateDistanceTo } from "@/lib/routing";
 import { SECTIONS, guessFlag } from "@/lib/types";
+import FlagIcon from "./FlagIcon";
 import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home } from "lucide-react";
 import Link from "next/link";
 
@@ -54,24 +55,22 @@ export default function GenericCardList({
     if (it.data.routeId) return `route:${it.data.routeId}`;
     return `grp:${it.data.group || "Allgemein"}`;
   };
-  const groupLabelOf = (it: any) => {
+  const groupLabelOf = (it: any): { country: string; text: string } => {
     if (it.data.unterkunftId) {
       const acc = unterkuenfte.find((a) => a.id === it.data.unterkunftId);
       if (acc) {
         const country = acc.data.country || "";
-        const flag = country ? guessFlag(country) : "";
-        return `${flag} ${country || "Unbekanntes Land"} (${acc.data.station})`.trim();
+        return { country, text: `${country || "Unbekanntes Land"} (${acc.data.station})` };
       }
     }
     if (it.data.routeId) {
       const leg = routeItems.find((r) => r.id === it.data.routeId);
       if (leg) {
         const country = leg.data.fromCountry || leg.data.land || "";
-        const flag = country ? guessFlag(country) : "";
-        return `${flag} ${country || "Unbekanntes Land"} (${leg.data.from})`.trim();
+        return { country, text: `${country || "Unbekanntes Land"} (${leg.data.from})` };
       }
     }
-    return it.data.group || "Allgemein";
+    return { country: "", text: it.data.group || "Allgemein" };
   };
   const groupSortDateOf = (key: string) => {
     if (key.startsWith("acc:")) {
@@ -85,7 +84,7 @@ export default function GenericCardList({
     return null;
   };
 
-  const groupMeta: Record<string, { label: string; sortDate: string | null }> = {};
+  const groupMeta: Record<string, { label: { country: string; text: string }; sortDate: string | null }> = {};
   items.forEach((it) => {
     const key = groupKeyOf(it);
     if (!groupMeta[key]) groupMeta[key] = { label: groupLabelOf(it), sortDate: groupSortDateOf(key) };
@@ -95,7 +94,7 @@ export default function GenericCardList({
     if (ga.sortDate && gb.sortDate) return ga.sortDate.localeCompare(gb.sortDate);
     if (ga.sortDate) return -1;
     if (gb.sortDate) return 1;
-    return ga.label.localeCompare(gb.label);
+    return ga.label.text.localeCompare(gb.label.text);
   });
 
   const startEdit = (it: any) => {
@@ -181,7 +180,10 @@ export default function GenericCardList({
               onClick={() => toggleGroup(groupKey)}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, marginBottom: isCollapsed ? 0 : 10, cursor: "pointer" }}
             >
-              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>{groupLabel2}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>
+                {groupLabel2.country && <FlagIcon country={groupLabel2.country} size={18} />}
+                {groupLabel2.text}
+              </span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#9A9384" }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{groupItems.length}</span>
                 {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}

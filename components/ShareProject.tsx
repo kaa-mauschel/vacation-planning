@@ -1,11 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { STYLE } from "@/lib/style";
-import { X, Copy, Check } from "lucide-react";
+import { X, Copy, Check, Users, PenLine } from "lucide-react";
 
-export default function ShareProject({ inviteCode, onClose }: { inviteCode: string; onClose: () => void }) {
+export default function ShareProject({ inviteCode, projectId, onClose }: { inviteCode: string; projectId: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [activeCount, setActiveCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { count } = await supabase
+        .from("project_members")
+        .select("*", { count: "exact", head: true })
+        .eq("project_id", projectId);
+      setMemberCount(count ?? null);
+
+      const { data: rows } = await supabase.from("items").select("created_by").eq("project_id", projectId);
+      const distinctContributors = new Set((rows || []).map((r: any) => r.created_by).filter(Boolean));
+      setActiveCount(distinctContributors.size);
+    })();
+  }, [projectId]);
 
   const handleCopy = async () => {
     try {
@@ -22,6 +39,26 @@ export default function ShareProject({ inviteCode, onClose }: { inviteCode: stri
           <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 18 }}>Mitreisende einladen</span>
           <button onClick={onClose} style={{ background: "none", border: "none" }}><X size={20} color="#9A9384" /></button>
         </div>
+
+        {memberCount !== null && (
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            <div style={{ flex: 1, background: STYLE.paperDim, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#6B6558" }}>
+                <Users size={14} />
+                <span style={{ fontSize: 11.5, fontWeight: 600 }}>Beigetreten</span>
+              </div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{memberCount}</div>
+            </div>
+            <div style={{ flex: 1, background: STYLE.paperDim, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#6B6558" }}>
+                <PenLine size={14} />
+                <span style={{ fontSize: 11.5, fontWeight: 600 }}>Haben eingetragen</span>
+              </div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{activeCount ?? "…"}</div>
+            </div>
+          </div>
+        )}
+
         <p style={{ fontSize: 13.5, color: "#6B6558", marginBottom: 14 }}>
           Teile diesen Code – jede Person meldet sich in der App an, tippt auf "Beitreten" und gibt ihn ein.
           Alle sehen dann dieselben Inhalte und können sie gemeinsam bearbeiten.

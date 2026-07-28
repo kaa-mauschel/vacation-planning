@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
-import { SECTIONS, PERSON_COLORS, PERSON_EMOJIS } from "@/lib/types";
+import { SECTIONS, PERSON_COLORS, PERSON_EMOJIS, CATEGORY_ICONS, guessCategoryIcon } from "@/lib/types";
 import { personStyle as fallbackStyle } from "@/lib/personStyle";
 import { Check, Plus, Pencil, X, ChevronDown, ChevronUp, Palette } from "lucide-react";
 
@@ -22,6 +22,8 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
   const [editingCatText, setEditingCatText] = useState("");
   const [collapsedOwners, setCollapsedOwners] = useState<Record<string, boolean>>({});
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [newCatIcon, setNewCatIcon] = useState("");
+  const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
@@ -46,11 +48,17 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
   const total = items.length;
   const done = items.filter((it) => it.data.checked).length;
 
+  // Icon einer Kategorie: von einem beliebigen Punkt darin übernommen, sonst Vorschlag anhand des Namens
+  const getCategoryIcon = (cat: string) => {
+    const withIcon = items.find((it) => (it.data.category || "Sonstiges") === cat && it.data.icon);
+    return withIcon?.data.icon || guessCategoryIcon(cat);
+  };
+
   const submitDraft = (owner: string, cat: string) => {
     const key = `${owner}|${cat}`;
     const text = (drafts[key] || "").trim();
     if (!text) return;
-    addItem({ category: cat, text, checked: false, owner });
+    addItem({ category: cat, text, checked: false, owner, icon: getCategoryIcon(cat) });
     setDrafts({ ...drafts, [key]: "" });
   };
 
@@ -59,9 +67,16 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
     if (!cat) return;
     const owner = newOwner === "__custom__" ? customOwner.trim() : newOwner;
     if (!owner) return;
-    addItem({ category: cat, text: "Erster Punkt…", checked: false, owner });
+    addItem({ category: cat, text: "Erster Punkt…", checked: false, owner, icon: newCatIcon || guessCategoryIcon(cat) });
     setNewCategory("");
     setCustomOwner("");
+    setNewCatIcon("");
+  };
+
+  const setCategoryIcon = async (owner: string, cat: string, icon: string) => {
+    const catItems = items.filter((it) => (it.data.category || "Sonstiges") === cat && (it.data.owner || ALLGEMEIN) === owner);
+    await Promise.all(catItems.map((it) => updateItem(it.id, { ...it.data, icon })));
+    setIconPickerFor(null);
   };
 
   const renameCategory = async (owner: string, oldName: string, newName: string) => {
@@ -160,9 +175,18 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
                   const catItems = ownerItems.filter((it) => (it.data.category || "Sonstiges") === cat);
                   const isEditingCat = editingCat === `${owner}|${cat}`;
                   const draftKey = `${owner}|${cat}`;
+                  const catIconKey = `${owner}|${cat}`;
+                  const catIcon = getCategoryIcon(cat);
                   return (
                     <div key={cat} style={{ background: STYLE.paperDim, borderRadius: 12, padding: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <button
+                          onClick={() => setIconPickerFor(iconPickerFor === catIconKey ? null : catIconKey)}
+                          style={{ background: "none", border: "none", fontSize: 17, lineHeight: 1, flexShrink: 0 }}
+                          title="Icon ändern"
+                        >
+                          {catIcon}
+                        </button>
                         {isEditingCat ? (
                           <input
                             autoFocus
@@ -182,6 +206,20 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
                           <X size={15} />
                         </button>
                       </div>
+                      {iconPickerFor === catIconKey && (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                          {CATEGORY_ICONS.map((ic) => (
+                            <button
+                              key={ic}
+                              type="button"
+                              onClick={() => setCategoryIcon(owner, cat, ic)}
+                              style={{ width: 30, height: 30, borderRadius: 8, fontSize: 15, background: catIcon === ic ? "#E4EFE7" : "#fff", border: catIcon === ic ? `2px solid ${STYLE.accent}` : "1px solid #E0D9C6" }}
+                            >
+                              {ic}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         {catItems.map((it) => {
                           const checked = !!it.data.checked;
@@ -289,6 +327,21 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
             onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }}
             style={{ padding: "8px 11px", borderRadius: 9, border: "1px solid #E0D9C6", fontSize: 13.5 }}
           />
+          <div>
+            <div style={{ fontSize: 11.5, color: "#9A9384", marginBottom: 5 }}>Icon (optional, sonst automatisch)</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {CATEGORY_ICONS.map((ic) => (
+                <button
+                  key={ic}
+                  type="button"
+                  onClick={() => setNewCatIcon(newCatIcon === ic ? "" : ic)}
+                  style={{ width: 32, height: 32, borderRadius: 8, fontSize: 16, background: newCatIcon === ic ? "#E4EFE7" : "#fff", border: newCatIcon === ic ? `2px solid ${STYLE.accent}` : "1px solid #E0D9C6" }}
+                >
+                  {ic}
+                </button>
+              ))}
+            </div>
+          </div>
           <button onClick={addCategory} style={{ padding: "10px 0", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Plus size={14} /> Kategorie anlegen
           </button>

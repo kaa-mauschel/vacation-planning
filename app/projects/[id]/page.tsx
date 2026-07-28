@@ -157,7 +157,7 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
         {tab === "tipps" && <Tipps projectId={project.id} />}
       </div>
 
-      {showShare && <ShareProject inviteCode={project.invite_code} onClose={() => setShowShare(false)} />}
+      {showShare && <ShareProject inviteCode={project.invite_code} projectId={project.id} onClose={() => setShowShare(false)} />}
       {showEdit && (
         <EditProjectModal
           project={project}
