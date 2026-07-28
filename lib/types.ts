@@ -33,7 +33,12 @@ export const SECTIONS = {
   TIPP: "tipp",
   NOTIZ: "notiz",
   UMGEBUNG: "umgebung",
+  PERSON: "person",
 } as const;
+
+// Auswahlmöglichkeiten für die persönliche Farbe/das Emoji pro Person (Packliste etc.)
+export const PERSON_COLORS = ["#5B9279", "#E0A45C", "#5FA3AE", "#9584B8", "#D97878", "#C98A3E", "#7A9E5C", "#B37FA0"];
+export const PERSON_EMOJIS = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "👱‍♂️", "🧑‍🦱", "👩‍🦰", "🧑‍🦰", "👩‍🦳", "🧑‍🦲", "👧", "👦", "👵", "👴", "🐶"];
 
 // Land -> Flagge, für die Routen-Übersicht (einfache Zuordnung, erweiterbar)
 export const COUNTRY_FLAGS: Record<string, string> = {

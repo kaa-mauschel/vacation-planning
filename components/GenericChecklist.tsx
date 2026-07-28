@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
-import { Check, Plus, Pencil, X, ChevronDown, ChevronUp } from "lucide-react";
-import { personStyle } from "@/lib/personStyle";
+import { SECTIONS, PERSON_COLORS, PERSON_EMOJIS } from "@/lib/types";
+import { personStyle as fallbackStyle } from "@/lib/personStyle";
+import { Check, Plus, Pencil, X, ChevronDown, ChevronUp, Palette } from "lucide-react";
 
 const ALLGEMEIN = "Allgemein";
 
 export default function GenericChecklist({ projectId, section }: { projectId: string; section: string }) {
   const { items, loading, addItem, updateItem, deleteItem } = useItems(projectId, section);
+  const { items: personPrefs, addItem: addPersonPref, updateItem: updatePersonPref } = useItems(projectId, SECTIONS.PERSON);
   const [newCategory, setNewCategory] = useState("");
   const [newOwner, setNewOwner] = useState(ALLGEMEIN);
   const [customOwner, setCustomOwner] = useState("");
@@ -19,6 +21,7 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [editingCatText, setEditingCatText] = useState("");
   const [collapsedOwners, setCollapsedOwners] = useState<Record<string, boolean>>({});
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
@@ -26,6 +29,19 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
   if (!owners.includes(ALLGEMEIN)) owners.unshift(ALLGEMEIN);
   owners.sort((a, b) => (a === ALLGEMEIN ? -1 : b === ALLGEMEIN ? 1 : a.localeCompare(b)));
   const existingOwners = Array.from(new Set(items.map((it) => it.data.owner || ALLGEMEIN))).filter((o) => o !== ALLGEMEIN);
+
+  // Frei wählbare Farbe/Emoji je Person, in der Datenbank gespeichert (für alle Mitreisenden
+  // gleich sichtbar). Falls noch nichts gewählt wurde: automatische Rückfalloption.
+  const personStyle = (name: string) => {
+    const pref = personPrefs.find((p) => p.data.name === name);
+    if (pref) return { color: pref.data.color, emoji: pref.data.emoji };
+    return fallbackStyle(name);
+  };
+  const savePersonStyle = (name: string, color: string, emoji: string) => {
+    const existing = personPrefs.find((p) => p.data.name === name);
+    if (existing) updatePersonPref(existing.id, { name, color, emoji });
+    else addPersonPref({ name, color, emoji });
+  };
 
   const total = items.length;
   const done = items.filter((it) => it.data.checked).length;
@@ -61,6 +77,39 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
     await Promise.all(catItems.map((it) => deleteItem(it.id)));
   };
 
+  const PersonPicker = ({ name }: { name: string }) => {
+    const current = personStyle(name);
+    return (
+      <div style={{ background: STYLE.paper, borderRadius: 10, padding: 12, marginTop: 10, border: "1px solid #E0D9C6" }}>
+        <div style={{ fontSize: 11.5, color: "#9A9384", marginBottom: 6 }}>Farbe</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          {PERSON_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => savePersonStyle(name, c, current.emoji)}
+              style={{ width: 30, height: 30, borderRadius: "50%", background: c, border: current.color === c ? "3px solid #3A3530" : "1px solid rgba(0,0,0,0.1)" }}
+            />
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#9A9384", marginBottom: 6 }}>Emoji</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          {PERSON_EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => savePersonStyle(name, current.color, e)}
+              style={{ width: 32, height: 32, borderRadius: 8, fontSize: 16, background: current.emoji === e ? "#E4EFE7" : "#fff", border: current.emoji === e ? `2px solid ${STYLE.accent}` : "1px solid #E0D9C6" }}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setPickerFor(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E0D9C6", background: "transparent", fontSize: 12.5 }}>Fertig</button>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
@@ -83,18 +132,27 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
 
         return (
           <div key={owner} style={{ ...cardStyle, background: owner === ALLGEMEIN ? STYLE.paper : "#F3F0E5", borderLeft: owner !== ALLGEMEIN ? `4px solid ${style.color}` : "none" }}>
-            <button
-              onClick={() => setCollapsedOwners({ ...collapsedOwners, [owner]: !ownerCollapsed })}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer" }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16.5, color: owner !== ALLGEMEIN ? style.color : STYLE.ink }}>
-                <span>{style.emoji}</span> {owner}
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#9A9384" }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{ownerDone}/{ownerItems.length}</span>
-                {ownerCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-              </span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <button
+                onClick={() => setCollapsedOwners({ ...collapsedOwners, [owner]: !ownerCollapsed })}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, background: "none", border: "none", padding: 0, cursor: "pointer" }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16.5, color: owner !== ALLGEMEIN ? style.color : STYLE.ink }}>
+                  <span>{style.emoji}</span> {owner}
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#9A9384", marginLeft: 10 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{ownerDone}/{ownerItems.length}</span>
+                  {ownerCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+                </span>
+              </button>
+              {owner !== ALLGEMEIN && (
+                <button onClick={() => setPickerFor(pickerFor === owner ? null : owner)} style={{ background: "none", border: "none", color: "#9A9384", marginLeft: 8 }}>
+                  <Palette size={15} />
+                </button>
+              )}
+            </div>
+
+            {pickerFor === owner && <PersonPicker name={owner} />}
 
             {!ownerCollapsed && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
