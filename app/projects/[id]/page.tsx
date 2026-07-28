@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT } from "@/lib/style";
-import { useHeaderColor } from "@/lib/theme";
+import { useHeaderColor, useTabOrder } from "@/lib/theme";
 import { SECTIONS } from "@/lib/types";
 import { useItems } from "@/lib/useItems";
 import type { Project } from "@/lib/types";
@@ -80,6 +80,8 @@ export default function ProjectPage() {
 
 function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showEdit, setShowEdit, headerColor, router, loadProject }: any) {
   const { items: routeItems } = useItems(project.id, SECTIONS.ROUTE);
+  const tabOrder = useTabOrder();
+  const orderedTabs = tabOrder.map((id) => TABS.find((t) => t.id === id)).filter(Boolean) as typeof TABS;
   const routeContext = routeItems
     .slice()
     .sort((a: any, b: any) => (a.data.date || "").localeCompare(b.data.date || ""))
@@ -110,7 +112,7 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
       </div>
 
       <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "14px 16px", background: STYLE.paper, position: "sticky", top: 0, zIndex: 10, borderBottom: `1px solid ${STYLE.paperDim}` }}>
-        {TABS.map((t) => {
+        {orderedTabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
           return (

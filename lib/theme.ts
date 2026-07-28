@@ -59,3 +59,50 @@ export function setStoredApiKey(value: string) {
   if (value) window.localStorage.setItem(API_KEY_STORAGE, value);
   else window.localStorage.removeItem(API_KEY_STORAGE);
 }
+
+// --- Reihenfolge der Reiter in einem Urlaubsprojekt, individuell pro Gerät ---
+export const DEFAULT_TAB_ORDER = [
+  "uebersicht", "route", "unterkuenfte", "kosten", "vorabreise",
+  "packliste", "mustdo", "aktivitaeten", "essen", "tagesplan", "tipps",
+];
+
+const TAB_ORDER_STORAGE = "urlaubsplaner-tab-order";
+
+export function getStoredTabOrder(): string[] {
+  if (typeof window === "undefined") return DEFAULT_TAB_ORDER;
+  try {
+    const raw = window.localStorage.getItem(TAB_ORDER_STORAGE);
+    if (!raw) return DEFAULT_TAB_ORDER;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_TAB_ORDER;
+    // Falls sich die verfügbaren Reiter mal ändern: unbekannte rausfiltern, neue hinten anhängen
+    const known = parsed.filter((id: string) => DEFAULT_TAB_ORDER.includes(id));
+    const missing = DEFAULT_TAB_ORDER.filter((id) => !known.includes(id));
+    return [...known, ...missing];
+  } catch {
+    return DEFAULT_TAB_ORDER;
+  }
+}
+
+export function setStoredTabOrder(order: string[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(TAB_ORDER_STORAGE, JSON.stringify(order));
+  window.dispatchEvent(new Event("taborder-changed"));
+}
+
+export function useTabOrder(): string[] {
+  const [order, setOrder] = useState<string[]>(DEFAULT_TAB_ORDER);
+
+  useEffect(() => {
+    setOrder(getStoredTabOrder());
+    const handler = () => setOrder(getStoredTabOrder());
+    window.addEventListener("taborder-changed", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("taborder-changed", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
+
+  return order;
+}

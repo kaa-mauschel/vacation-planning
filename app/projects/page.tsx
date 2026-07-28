@@ -119,14 +119,12 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <>
-            {nextTrip && <NextTripCountdown project={nextTrip} onClick={() => router.push(`/projects/${nextTrip.id}`)} />}
-
             {upcoming.length === 0 ? (
-              <div style={{ ...cardStyle, textAlign: "center", padding: 24, marginTop: 14 }}>
+              <div style={{ ...cardStyle, textAlign: "center", padding: 24 }}>
                 <p style={{ fontSize: 14, color: "#6B6558" }}>Keine bevorstehenden Urlaube.</p>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: nextTrip ? 14 : 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {upcoming.map((p) => (
                   <ProjectCard key={p.id} project={p} highlighted={p.id === nextTrip?.id} onClick={() => router.push(`/projects/${p.id}`)} />
                 ))}
@@ -161,9 +159,21 @@ export default function ProjectsPage() {
   );
 }
 
+function daysUntilLabel(start: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(start + "T00:00:00");
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Heute!";
+  if (diffDays === 1) return "Morgen!";
+  if (diffDays > 1) return `in ${diffDays} Tagen`;
+  return "";
+}
+
 function ProjectCard({ project: p, onClick, highlighted }: { project: Project; onClick: () => void; highlighted?: boolean }) {
   const status = getStatus(p.start_date, p.end_date);
   const dur = p.start_date && p.end_date ? daysBetween(p.start_date, p.end_date) : null;
+  const countdown = status.label === "Bevorstehend" && p.start_date ? daysUntilLabel(p.start_date) : null;
   return (
     <button
       onClick={onClick}
@@ -176,6 +186,11 @@ function ProjectCard({ project: p, onClick, highlighted }: { project: Project; o
           <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: status.bg, color: status.color, flexShrink: 0 }}>
             {status.label}
           </span>
+          {countdown && (
+            <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: STYLE.headerBg, color: STYLE.headerText, flexShrink: 0 }}>
+              {countdown}
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 12, color: "#9A9384", marginTop: 3, display: "flex", alignItems: "center", gap: 5 }}>
           <CalendarDays size={12} />
@@ -187,44 +202,6 @@ function ProjectCard({ project: p, onClick, highlighted }: { project: Project; o
             <span>Angelegt am {new Date(p.created_at).toLocaleDateString("de-DE")}</span>
           )}
         </div>
-      </div>
-    </button>
-  );
-}
-
-function NextTripCountdown({ project, onClick }: { project: Project; onClick: () => void }) {
-  const headerColor = useHeaderColor();
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  if (!project.start_date) return null;
-  const target = new Date(project.start_date + "T00:00:00").getTime();
-  const diff = Math.max(0, target - now);
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-  const minutes = Math.floor((diff / (1000 * 60)) % 60);
-  const seconds = Math.floor((diff / 1000) % 60);
-
-  return (
-    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: headerColor, border: "none", borderRadius: 16, padding: "16px 18px", color: STYLE.headerText }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 20 }}>{project.emoji}</span>
-        <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{project.name}</span>
-        <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "rgba(255,255,255,0.55)" }}>
-          Nächster Urlaub
-        </span>
-      </div>
-      <div style={{ display: "flex", gap: 16 }}>
-        {[["Tage", days], ["Std.", hours], ["Min.", minutes], ["Sek.", seconds]].map(([label, val]) => (
-          <div key={label as string}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, lineHeight: 1 }}>{String(val).padStart(2, "0")}</div>
-            <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>{label}</div>
-          </div>
-        ))}
       </div>
     </button>
   );
