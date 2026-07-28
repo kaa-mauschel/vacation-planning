@@ -28,7 +28,7 @@ function fmtDate(d: string) {
 }
 
 export default function Uebersicht({ projectId, startDate }: { projectId: string; startDate: string | null }) {
-  const { items: routeItems, loading: routeLoading } = useItems(projectId, SECTIONS.ROUTE);
+  const { items: routeItems } = useItems(projectId, SECTIONS.ROUTE);
   const { items: unterkunftItems, loading: unterkunftLoading } = useItems(projectId, SECTIONS.UNTERKUNFT);
   const { items: notizItems, addItem: addNotiz, updateItem: updateNotiz } = useItems(projectId, SECTIONS.NOTIZ);
 
@@ -47,15 +47,9 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     }
   };
 
-  // Route-Etappen (Fahrten), sortiert nach der im Route-Tab festgelegten Reihenfolge.
   const sortedRoute = routeItems;
-  const totalKm = sortedRoute.reduce((sum, it) => {
-    const n = parseFloat(String(it.data.km || "").replace(/[^\d.,]/g, "").replace(",", "."));
-    return sum + (isNaN(n) ? 0 : n);
-  }, 0);
 
-  // Die Karte & "wann wo wie lange" basiert auf den Unterkünften – die haben schon
-  // die richtigen An-/Abreisedaten. Nach Datum sortiert (Unterkünfte ohne Datum ans Ende).
+  // "Wo & wie lange" basiert auf den Unterkünften (die haben die richtigen An-/Abreisedaten).
   const stays = [...unterkunftItems].sort((a, b) => {
     if (a.data.von && b.data.von) return a.data.von.localeCompare(b.data.von);
     if (a.data.von) return -1;
@@ -63,8 +57,9 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     return 0;
   });
 
-  const geoStays = stays
-    .map((it, i) => ({
+  const stayPoints = stays
+    .filter((it) => it.data.lat && it.data.lon)
+    .map((it) => ({
       id: it.id,
       name: it.data.station,
       lat: it.data.lat, lon: it.data.lon,
@@ -72,9 +67,50 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
       symbol: it.data.symbol || "",
       arrival: it.data.von || null,
       departure: it.data.bis || null,
-      listNumber: i + 1,
-    }))
-    .filter((s) => s.lat && s.lon);
+      isStay: true,
+    }));
+
+  const stayNames = new Set(stayPoints.map((p) => (p.name || "").trim().toLowerCase()));
+
+  // Zusätzlich: kurze Zwischenstopps aus der Route (z. B. Ingolstadt auf dem Weg),
+  // die noch nicht schon als Unterkunft erfasst sind.
+  const routeStopPoints: any[] = [];
+  sortedRoute.forEach((leg, i) => {
+    const fromName = (leg.data.from || "").trim();
+    if (fromName && leg.data.lat && leg.data.lon && !stayNames.has(fromName.toLowerCase())) {
+      routeStopPoints.push({
+        id: `${leg.id}-from`,
+        name: leg.data.from,
+        lat: leg.data.lat, lon: leg.data.lon,
+        country: leg.data.fromCountry || leg.data.land,
+        symbol: leg.data.symbol || "",
+        arrival: null,
+        departure: leg.data.date || null,
+        isStay: false,
+      });
+      stayNames.add(fromName.toLowerCase());
+    }
+    // Letzte Etappe: auch das Fahrtziel zeigen, falls es noch nirgends erfasst ist
+    const toName = (leg.data.to || "").trim();
+    if (i === sortedRoute.length - 1 && toName && leg.data.toLat && leg.data.toLon && !stayNames.has(toName.toLowerCase())) {
+      routeStopPoints.push({
+        id: `${leg.id}-to`,
+        name: leg.data.to,
+        lat: leg.data.toLat, lon: leg.data.toLon,
+        country: leg.data.toCountry,
+        symbol: "",
+        arrival: leg.data.date || null,
+        departure: null,
+        isStay: false,
+      });
+      stayNames.add(toName.toLowerCase());
+    }
+  });
+
+  const combined = [...stayPoints, ...routeStopPoints].sort((a, b) =>
+    (a.arrival || a.departure || "").localeCompare(b.arrival || b.departure || "")
+  );
+  const geoStays = combined.map((s, i) => ({ ...s, listNumber: i + 1 }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -87,19 +123,19 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
             <RealMap stops={geoStays} accentColor={STYLE.accent} />
           </div>
           <p style={{ fontSize: 12, color: "#9A9384", margin: "8px 0 0" }}>
-            Basiert auf den Unterkünften. Fehlt eine Station (z. B. das eigentliche Endziel), im Tab "Unterkünfte"
-            ergänzen und dort "Koordinaten & Land finden" klicken.
+            Große Punkte = Unterkünfte (Aufenthaltsdauer), kleine Punkte = Zwischenstopps auf der Fahrt.
+            Details zur Route findest du im Tab "Route".
           </p>
         </div>
       )}
-      {geoStays.length < 2 && stays.length > 0 && (
+      {geoStays.length < 2 && (stays.length > 0 || sortedRoute.length > 0) && (
         <div style={{ ...cardStyle, fontSize: 13, color: "#9A9384" }}>
-          Trage bei mindestens 2 Unterkünften im Tab "Unterkünfte" Koordinaten ein (Button "Koordinaten & Land finden"), um hier eine Landkarte zu sehen.
+          Trage bei mindestens 2 Unterkünften oder Route-Etappen Koordinaten ein (Button "Koordinaten finden" bzw. "berechnen"), um hier eine Landkarte zu sehen.
         </div>
       )}
-      {stays.length === 0 && !unterkunftLoading && (
+      {stays.length === 0 && sortedRoute.length === 0 && !unterkunftLoading && (
         <div style={{ ...cardStyle, fontSize: 13, color: "#9A9384" }}>
-          Noch keine Unterkünfte eingetragen – im Tab "Unterkünfte" hinzufügen, dann erscheinen sie hier mit Karte und Aufenthaltsdauer.
+          Noch keine Unterkünfte oder Route-Etappen eingetragen – dann erscheinen hier Karte und Aufenthaltsdauer.
         </div>
       )}
 
@@ -135,42 +171,6 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
           </div>
         </div>
       )}
-
-      <div style={cardStyle}>
-        <SectionTitle icon={MapPin} text="Eure Route" />
-        {routeLoading ? (
-          <p style={{ fontSize: 13.5, color: "#9A9384", marginTop: 8 }}>Lädt…</p>
-        ) : sortedRoute.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: "#9A9384", marginTop: 8 }}>Noch keine Etappen im Tab "Route" eingetragen.</p>
-        ) : (
-          <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-              {sortedRoute.map((it, i) => (
-                <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", background: STYLE.paperDim, borderRadius: 10 }}>
-                  <span style={{
-                    width: 20, height: 20, borderRadius: "50%", background: it.data.lat && it.data.lon ? STYLE.accent : "#D8D2C4",
-                    color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}>
-                    {i + 1}
-                  </span>
-                  <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>
-                    {(it.data.fromCountry || it.data.land) ? guessFlag(it.data.fromCountry || it.data.land) : ""} {it.data.symbol || ""} {it.data.from} → {it.data.to}
-                  </span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558", flexShrink: 0 }}>
-                    {it.data.km ? `${it.data.km}` : ""}{it.data.h ? ` · ${it.data.h}` : ""}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {totalKm > 0 && (
-              <div style={{ marginTop: 10, fontSize: 12.5, color: "#6B6558" }}>
-                Gesamtstrecke ungefähr: <strong>{totalKm.toLocaleString("de-DE")} km</strong>
-              </div>
-            )}
-          </>
-        )}
-      </div>
 
       <div style={cardStyle}>
         <SectionTitle icon={Sparkles} text="Gut zu wissen" />
