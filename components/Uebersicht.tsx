@@ -70,7 +70,7 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
               {sortedRoute.map((it) => (
                 <div key={it.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 11px", background: STYLE.paperDim, borderRadius: 10 }}>
                   <span style={{ fontSize: 13.5, fontWeight: 600 }}>
-                    {it.data.land ? guessFlag(it.data.land) : ""} {it.data.from} → {it.data.to}
+                    {(it.data.fromCountry || it.data.land) ? guessFlag(it.data.fromCountry || it.data.land) : ""} {it.data.symbol || ""} {it.data.from} → {it.data.to}
                   </span>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558" }}>
                     {it.data.km ? `${it.data.km}` : ""}{it.data.h ? ` · ${it.data.h}` : ""}
@@ -154,15 +154,15 @@ function Countdown({ startDate }: { startDate: string }) {
 
 function RouteMap({ stops }: { stops: any[] }) {
   const width = 340;
-  const height = 380;
+  const height = 420;
   const lats = stops.map((s) => parseFloat(s.data.lat));
   const lons = stops.map((s) => parseFloat(s.data.lon));
   const latMin = Math.min(...lats) - 1, latMax = Math.max(...lats) + 1;
   const lonMin = Math.min(...lons) - 1, lonMax = Math.max(...lons) + 1;
 
   const project = (lat: number, lon: number): [number, number] => {
-    const x = ((lon - lonMin) / (lonMax - lonMin || 1)) * width;
-    const y = ((latMax - lat) / (latMax - latMin || 1)) * height;
+    const x = 20 + ((lon - lonMin) / (lonMax - lonMin || 1)) * (width - 40);
+    const y = 20 + ((latMax - lat) / (latMax - latMin || 1)) * (height - 40);
     return [x, y];
   };
 
@@ -171,23 +171,40 @@ function RouteMap({ stops }: { stops: any[] }) {
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", display: "block" }}>
-      <path d={pathD} fill="none" stroke={STYLE.ink} strokeWidth="2.5" strokeDasharray="6 6" opacity="0.4" />
+      <path d={pathD} fill="none" stroke={STYLE.ink} strokeWidth="2.5" strokeDasharray="6 6" opacity="0.35" />
       {stops.map((s, i) => {
         const [x, y] = points[i];
         const labelRight = x < width / 2;
+        const labelUp = i % 2 === 0; // Labels abwechselnd über/unter dem Punkt gegen Überlappung
+        const labelY = labelUp ? y - 14 : y + 20;
+        const flagCountry = s.data.fromCountry || s.data.land;
+        const labelText = `${flagCountry ? guessFlag(flagCountry) : ""}${s.data.symbol ? " " + s.data.symbol : ""} ${s.data.from}`.trim();
+        const approxWidth = labelText.length * 6.5 + 10;
         return (
           <g key={s.id}>
-            <circle cx={x} cy={y} r="7" fill={STYLE.accent} stroke={STYLE.paper} strokeWidth="2.5" />
+            <rect
+              x={labelRight ? x + 8 : x - 8 - approxWidth}
+              y={labelY - 11}
+              width={approxWidth}
+              height={16}
+              rx={5}
+              fill={STYLE.paper}
+              opacity="0.88"
+            />
             <text
-              x={x + (labelRight ? 11 : -11)}
-              y={y + 4}
+              x={labelRight ? x + 12 : x - 12}
+              y={labelY}
               fontSize="11.5"
               fontFamily="'Inter', sans-serif"
               fontWeight="700"
               fill={STYLE.ink}
               textAnchor={labelRight ? "start" : "end"}
             >
-              {s.data.land ? guessFlag(s.data.land) : ""} {s.data.from}
+              {labelText}
+            </text>
+            <circle cx={x} cy={y} r="9" fill={STYLE.accent} stroke={STYLE.paper} strokeWidth="2.5" />
+            <text x={x} y={y + 3.5} fontSize="9" fontFamily="'JetBrains Mono', monospace" fontWeight="700" fill="#fff" textAnchor="middle">
+              {i + 1}
             </text>
           </g>
         );

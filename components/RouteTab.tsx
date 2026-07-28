@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
-import { guessFlag } from "@/lib/types";
+import { guessFlag, PLACE_SYMBOLS } from "@/lib/types";
 import { MapPin, Plus, X, Pencil, GripVertical, Route as RouteIcon, Loader2 } from "lucide-react";
 import { calculateLeg } from "@/lib/routing";
 
@@ -11,7 +11,7 @@ function mapsDirectionsLink(from: string, to: string) {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=driving`;
 }
 
-const EMPTY_FORM = { from: "", fromAddress: "", to: "", toAddress: "", date: "", km: "", h: "", land: "", lat: "", lon: "" };
+const EMPTY_FORM = { from: "", fromAddress: "", to: "", toAddress: "", date: "", km: "", h: "", land: "", fromCountry: "", symbol: "", lat: "", lon: "" };
 
 export default function RouteTab({ projectId }: { projectId: string }) {
   const { items, loading, addItem, updateItem, deleteItem, reload } = useItems(projectId, "route");
@@ -30,12 +30,10 @@ export default function RouteTab({ projectId }: { projectId: string }) {
   const draggingRef = useRef(false);
 
   useEffect(() => {
-    if (draggingRef.current) return; // während des Ziehens nicht von außen überschreiben
+    if (draggingRef.current) return;
     setOrder(items);
   }, [items]);
 
-  // Einmaliges Reparieren: falls Positionen durcheinander/gleich sind (alte Einträge, die
-  // alle Position 0 hatten), nach Datum neu durchnummerieren.
   useEffect(() => {
     if (loading || normalizedOnce.current || items.length < 2) return;
     const positions = items.map((it) => it.position);
@@ -86,7 +84,19 @@ export default function RouteTab({ projectId }: { projectId: string }) {
       setCalcError(result.error);
       return;
     }
-    setForm({ ...form, km: result.km, h: result.h, lat: result.lat, lon: result.lon });
+    setForm({ ...form, km: result.km, h: result.h, lat: result.lat, lon: result.lon, fromCountry: result.fromCountry, land: result.fromCountry || form.land });
+  };
+
+  const handleCalculateEdit = async () => {
+    const fromQuery = editForm.fromAddress.trim() || editForm.from.trim();
+    const toQuery = editForm.toAddress.trim() || editForm.to.trim();
+    if (!fromQuery || !toQuery) { setCalcError("Bitte erst \"Von\"/\"Nach\" (oder die Adressfelder) ausfüllen."); return; }
+    setCalculating(true);
+    setCalcError("");
+    const result = await calculateLeg(fromQuery, toQuery);
+    setCalculating(false);
+    if (result.error) { setCalcError(result.error); return; }
+    setEditForm({ ...editForm, km: result.km, h: result.h, lat: result.lat, lon: result.lon, fromCountry: result.fromCountry, land: result.fromCountry || editForm.land });
   };
 
   const startEdit = (it: any) => {
@@ -94,7 +104,8 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     setEditForm({
       from: it.data.from || "", fromAddress: it.data.fromAddress || "",
       to: it.data.to || "", toAddress: it.data.toAddress || "",
-      date: it.data.date || "", km: it.data.km || "", h: it.data.h || "", land: it.data.land || "",
+      date: it.data.date || "", km: it.data.km || "", h: it.data.h || "",
+      land: it.data.land || "", fromCountry: it.data.fromCountry || "", symbol: it.data.symbol || "",
       lat: it.data.lat || "", lon: it.data.lon || "",
     });
   };
@@ -118,22 +129,16 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     if (dragIndexRef.current === null) return;
     const currentIndex = dragIndexRef.current;
     const pointerY = e.clientY;
-
-    // Finde die Zeile, über der sich der Finger/Cursor gerade befindet
     let targetIndex = currentIndex;
     for (let i = 0; i < order.length; i++) {
       const el = rowRefs.current[order[i].id];
       if (!el) continue;
       const rect = el.getBoundingClientRect();
       const mid = rect.top + rect.height / 2;
-      if (pointerY < mid) {
-        targetIndex = i;
-        break;
-      }
+      if (pointerY < mid) { targetIndex = i; break; }
       targetIndex = i + 1;
     }
     targetIndex = Math.max(0, Math.min(order.length - 1, targetIndex));
-
     if (targetIndex !== currentIndex) {
       const next = [...order];
       const [moved] = next.splice(currentIndex, 1);
@@ -151,6 +156,29 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     persistOrder(order.map((it) => it.id));
   };
 
+  const SymbolPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div>
+      <div style={{ fontSize: 11.5, color: "#9A9384", marginBottom: 5 }}>Charakter des Ortes (optional)</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {PLACE_SYMBOLS.map((s) => (
+          <button
+            key={s.emoji}
+            type="button"
+            onClick={() => onChange(value === s.emoji ? "" : s.emoji)}
+            title={s.label}
+            style={{
+              width: 34, height: 34, borderRadius: 8, fontSize: 16,
+              border: value === s.emoji ? `2px solid ${STYLE.accent}` : "1px solid #E0D9C6",
+              background: value === s.emoji ? "#E4EFE7" : "#fff",
+            }}
+          >
+            {s.emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
@@ -161,7 +189,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             const isEditing = editingId === it.id;
             if (isEditing) {
               return (
-                <div key={it.id} style={{ padding: "10px", background: STYLE.paperDim, borderRadius: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div key={it.id} style={{ padding: "10px", background: STYLE.paperDim, borderRadius: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ display: "flex", gap: 8 }}>
                     <input placeholder="Von" value={editForm.from} onChange={(e) => setEditForm({ ...editForm, from: e.target.value })} style={inputStyle} />
                     <input placeholder="Nach" value={editForm.to} onChange={(e) => setEditForm({ ...editForm, to: e.target.value })} style={inputStyle} />
@@ -171,27 +199,17 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                     <input placeholder="Nach-Adresse (optional, genauer)" value={editForm.toAddress} onChange={(e) => setEditForm({ ...editForm, toAddress: e.target.value })} style={{ ...inputStyle, fontSize: 12.5 }} />
                   </div>
                   <button
-                    onClick={async () => {
-                      const fromQuery = editForm.fromAddress.trim() || editForm.from.trim();
-                      const toQuery = editForm.toAddress.trim() || editForm.to.trim();
-                      if (!fromQuery || !toQuery) { setCalcError("Bitte erst \"Von\"/\"Nach\" (oder die Adressfelder) ausfüllen."); return; }
-                      setCalculating(true);
-                      setCalcError("");
-                      const result = await calculateLeg(fromQuery, toQuery);
-                      setCalculating(false);
-                      if (result.error) { setCalcError(result.error); return; }
-                      setEditForm({ ...editForm, km: result.km, h: result.h, lat: result.lat, lon: result.lon });
-                    }}
+                    onClick={handleCalculateEdit}
                     disabled={calculating}
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: `1px solid ${STYLE.accent4}`, background: "transparent", color: STYLE.accent4, fontSize: 12.5, fontWeight: 600, opacity: calculating ? 0.6 : 1 }}
                   >
                     {calculating ? <Loader2 size={13} className="animate-spin" /> : <RouteIcon size={13} />}
-                    {calculating ? "Berechne…" : "km, Fahrzeit & Koordinaten berechnen"}
+                    {calculating ? "Berechne…" : "km, Fahrzeit, Land & Koordinaten berechnen"}
                   </button>
                   {calcError && <p style={{ fontSize: 11.5, color: STYLE.danger, margin: 0 }}>{calcError}</p>}
                   <div style={{ display: "flex", gap: 8 }}>
                     <input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} style={inputStyle} />
-                    <input placeholder="Land" value={editForm.land} onChange={(e) => setEditForm({ ...editForm, land: e.target.value })} style={inputStyle} />
+                    <input placeholder="Land (wird automatisch erkannt)" value={editForm.land} onChange={(e) => setEditForm({ ...editForm, land: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <input placeholder="≈ km" value={editForm.km} onChange={(e) => setEditForm({ ...editForm, km: e.target.value })} style={inputStyle} />
@@ -201,6 +219,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                     <input placeholder="Breitengrad (lat)" value={editForm.lat} onChange={(e) => setEditForm({ ...editForm, lat: e.target.value })} style={inputStyle} />
                     <input placeholder="Längengrad (lon)" value={editForm.lon} onChange={(e) => setEditForm({ ...editForm, lon: e.target.value })} style={inputStyle} />
                   </div>
+                  <SymbolPicker value={editForm.symbol} onChange={(v) => setEditForm({ ...editForm, symbol: v })} />
                   <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                     <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #E0D9C6", background: "transparent", fontSize: 13 }}>Abbrechen</button>
                     <button onClick={() => saveEdit(it.id)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: STYLE.accent, color: "#fff", fontSize: 13, fontWeight: 600 }}>Speichern</button>
@@ -209,6 +228,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
               );
             }
             const isDragging = draggingId === it.id;
+            const flagCountry = it.data.fromCountry || it.data.land;
             return (
               <div
                 key={it.id}
@@ -238,7 +258,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                   style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", textDecoration: "none", color: "inherit", gap: 8, minWidth: 0 }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                    {it.data.land ? guessFlag(it.data.land) : ""} {it.data.from} → {it.data.to} <MapPin size={12} color={STYLE.accent4} />
+                    {flagCountry ? guessFlag(flagCountry) : ""} {it.data.symbol || ""} {it.data.from} → {it.data.to} <MapPin size={12} color={STYLE.accent4} />
                   </span>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558", textAlign: "right", flexShrink: 0 }}>
                     {it.data.date ? `${new Date(it.data.date).toLocaleDateString("de-DE")} · ` : ""}{it.data.km} {it.data.h && `· ${it.data.h}`}
@@ -274,12 +294,12 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 9, border: `1px solid ${STYLE.accent4}`, background: "transparent", color: STYLE.accent4, fontSize: 13, fontWeight: 600, opacity: calculating ? 0.6 : 1 }}
           >
             {calculating ? <Loader2 size={14} className="animate-spin" /> : <RouteIcon size={14} />}
-            {calculating ? "Berechne…" : "km, Fahrzeit & Koordinaten automatisch berechnen"}
+            {calculating ? "Berechne…" : "km, Fahrzeit, Land & Koordinaten automatisch berechnen"}
           </button>
           {calcError && <p style={{ fontSize: 12, color: STYLE.danger, margin: 0 }}>{calcError}</p>}
           <div style={{ display: "flex", gap: 8 }}>
             <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={inputStyle} />
-            <input placeholder="Land (z. B. Österreich)" value={form.land} onChange={(e) => setForm({ ...form, land: e.target.value })} style={inputStyle} />
+            <input placeholder="Land (wird automatisch erkannt)" value={form.land} onChange={(e) => setForm({ ...form, land: e.target.value })} style={inputStyle} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <input placeholder="≈ km" value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} style={inputStyle} />
@@ -289,10 +309,11 @@ export default function RouteTab({ projectId }: { projectId: string }) {
             <input placeholder="Breitengrad (lat)" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} style={inputStyle} />
             <input placeholder="Längengrad (lon)" value={form.lon} onChange={(e) => setForm({ ...form, lon: e.target.value })} style={inputStyle} />
           </div>
+          <SymbolPicker value={form.symbol} onChange={(v) => setForm({ ...form, symbol: v })} />
           <p style={{ fontSize: 11.5, color: "#9A9384", margin: 0 }}>
             "Von"/"Nach" ist der Name, der überall angezeigt wird (kurz halten). Die Adressfelder sind nur für die
-            genaue Berechnung & den Google-Maps-Link – wenn leer, wird stattdessen "Von"/"Nach" verwendet.
-            Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert.
+            genaue Berechnung & den Google-Maps-Link. Beim Berechnen wird auch das Land automatisch erkannt
+            (wichtig für die richtige Flagge). Mit Datum wird die Etappe automatisch an der richtigen Stelle einsortiert.
           </p>
           <button onClick={submit} style={{ padding: "10px 0", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Plus size={14} /> Etappe speichern

@@ -5,16 +5,18 @@
 // - OSRM (Open Source Routing Machine): berechnet Autoroute, Distanz & Fahrzeit
 // Beide sind öffentliche Demo-Server, gedacht für gelegentliche, private Nutzung wie hier.
 
-export type GeoPoint = { lat: number; lon: number; displayName: string };
+export type GeoPoint = { lat: number; lon: number; displayName: string; country: string };
 
 export async function geocode(query: string): Promise<GeoPoint | null> {
   if (!query.trim()) return null;
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) return null;
   const data = await res.json();
   if (!Array.isArray(data) || data.length === 0) return null;
-  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), displayName: data[0].display_name };
+  const item = data[0];
+  const country = item.address?.country || item.display_name?.split(",").pop()?.trim() || "";
+  return { lat: parseFloat(item.lat), lon: parseFloat(item.lon), displayName: item.display_name, country };
 }
 
 export type DrivingRoute = { km: number; hours: number };
@@ -38,23 +40,26 @@ export function formatHours(hours: number): string {
 }
 
 // Führt Geocoding + Routenberechnung für eine Etappe in einem Schritt aus.
+// Gibt zusätzlich das automatisch erkannte Land des Startpunkts zurück (für die
+// korrekte Flagge auf der Karte).
 export async function calculateLeg(fromQuery: string, toQuery: string): Promise<{
-  km: string; h: string; lat: string; lon: string; error?: string;
+  km: string; h: string; lat: string; lon: string; fromCountry: string; error?: string;
 }> {
   const from = await geocode(fromQuery);
-  if (!from) return { km: "", h: "", lat: "", lon: "", error: `"${fromQuery}" konnte nicht gefunden werden.` };
+  if (!from) return { km: "", h: "", lat: "", lon: "", fromCountry: "", error: `"${fromQuery}" konnte nicht gefunden werden.` };
   // Kurze Pause, um die kostenlose Nominatim-Nutzungsrichtlinie (max. 1 Anfrage/Sek.) einzuhalten
   await new Promise((r) => setTimeout(r, 1000));
   const to = await geocode(toQuery);
-  if (!to) return { km: "", h: "", lat: String(from.lat), lon: String(from.lon), error: `"${toQuery}" konnte nicht gefunden werden.` };
+  if (!to) return { km: "", h: "", lat: String(from.lat), lon: String(from.lon), fromCountry: from.country, error: `"${toQuery}" konnte nicht gefunden werden.` };
 
   const route = await getDrivingRoute(from, to);
-  if (!route) return { km: "", h: "", lat: String(from.lat), lon: String(from.lon), error: "Route konnte nicht berechnet werden." };
+  if (!route) return { km: "", h: "", lat: String(from.lat), lon: String(from.lon), fromCountry: from.country, error: "Route konnte nicht berechnet werden." };
 
   return {
     km: `≈ ${Math.round(route.km)} km`,
     h: `≈ ${formatHours(route.hours)}`,
     lat: String(from.lat),
     lon: String(from.lon),
+    fromCountry: from.country,
   };
 }

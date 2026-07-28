@@ -47,3 +47,16 @@ export const COUNTRY_FLAGS: Record<string, string> = {
 export function guessFlag(country: string): string {
   return COUNTRY_FLAGS[country.trim().toLowerCase()] || "🌍";
 }
+
+// Kleine Symbol-Auswahl, um jeder Etappe/jedem Ort einen Charakter zuzuordnen
+// (z. B. Berge für Österreich, Meer für Hyères) – wird vom Nutzer selbst gewählt.
+export const PLACE_SYMBOLS = [
+  { emoji: "🏔️", label: "Berge" },
+  { emoji: "🌊", label: "Meer/Strand" },
+  { emoji: "🏙️", label: "Stadt" },
+  { emoji: "🍷", label: "Kulinarik" },
+  { emoji: "🌲", label: "Natur" },
+  { emoji: "🏛️", label: "Kultur" },
+  { emoji: "⛷️", label: "Wintersport" },
+  { emoji: "🏰", label: "Sehenswürdigkeit" },
+];
