@@ -63,7 +63,7 @@ export function setStoredApiKey(value: string) {
 // --- Reihenfolge der Reiter in einem Urlaubsprojekt, individuell pro Gerät ---
 export const DEFAULT_TAB_ORDER = [
   "uebersicht", "route", "unterkuenfte", "kosten", "vorabreise",
-  "packliste", "mustdo", "aktivitaeten", "essen", "tagesplan", "tipps",
+  "packliste", "mustdo", "aktivitaeten", "umgebung", "essen", "tagesplan", "tipps",
 ];
 
 const TAB_ORDER_STORAGE = "urlaubsplaner-tab-order";

@@ -16,6 +16,7 @@ const TAB_LABELS: Record<string, string> = {
   kosten: "Kosten",
   essen: "Essen & Trinken",
   aktivitaeten: "Aktivitäten",
+  umgebung: "Umgebung",
   mustdo: "Must-Dos",
   tagesplan: "Tagesplanung",
   tipps: "Tipps",

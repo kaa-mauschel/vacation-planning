@@ -39,7 +39,14 @@ export function formatHours(hours: number): string {
   return `${h} Std. ${m} Min.`;
 }
 
-// Führt Geocoding + Routenberechnung für eine Etappe in einem Schritt aus.
+// Berechnet die Fahrentfernung von einem Ort zu festen Koordinaten (z. B. einer Unterkunft).
+export async function calculateDistanceTo(fromQuery: string, toLat: number, toLon: number): Promise<{ km: string; error?: string }> {
+  const from = await geocode(fromQuery);
+  if (!from) return { km: "", error: `"${fromQuery}" konnte nicht gefunden werden.` };
+  const route = await getDrivingRoute(from, { lat: toLat, lon: toLon, displayName: "", country: "" });
+  if (!route) return { km: "", error: "Entfernung konnte nicht berechnet werden." };
+  return { km: `≈ ${Math.round(route.km)} km` };
+}
 // Gibt Koordinaten & erkanntes Land für BEIDE Punkte zurück (Start und Ziel) –
 // so lässt sich später auch der Zielort auf der Karte anzeigen und die
 // Aufenthaltsdauer pro Ort berechnen.

@@ -19,7 +19,7 @@ import Tagesplanung from "@/components/Tagesplanung";
 import Tipps from "@/components/Tipps";
 import ShareProject from "@/components/ShareProject";
 import {
-  ArrowLeft, MapPin, Backpack, ClipboardList, Home, Wallet,
+  ArrowLeft, MapPin, Backpack, ClipboardList, Home, Wallet, Trees,
   Utensils, Sparkles, Star, CalendarDays, Lightbulb, Share2, Pencil, X, LayoutGrid,
 } from "lucide-react";
 
@@ -32,6 +32,7 @@ const TABS = [
   { id: "kosten", label: "Kosten", icon: Wallet },
   { id: "essen", label: "Essen & Trinken", icon: Utensils },
   { id: "aktivitaeten", label: "Aktivitäten", icon: Sparkles },
+  { id: "umgebung", label: "Umgebung", icon: Trees },
   { id: "mustdo", label: "Must-Dos", icon: Star },
   { id: "tagesplan", label: "Tagesplanung", icon: CalendarDays },
   { id: "tipps", label: "Tipps", icon: Lightbulb },
@@ -145,6 +146,9 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
         )}
         {tab === "aktivitaeten" && (
           <GenericCardList projectId={project.id} section={SECTIONS.AKTIVITAET} groupLabel="Ort/Kategorie (z. B. Freibäder)" extraFieldLabel="Adresse/Kontext für Maps" aiKind="aktivitaet" projectName={project.name} routeContext={routeContext} />
+        )}
+        {tab === "umgebung" && (
+          <GenericCardList projectId={project.id} section={SECTIONS.UMGEBUNG} groupLabel="Region" extraFieldLabel="Adresse/Kontext für Maps" />
         )}
         {tab === "mustdo" && (
           <GenericCardList projectId={project.id} section={SECTIONS.MUSTDO} groupLabel="Region" extraFieldLabel="Adresse/Kontext für Maps" aiKind="mustdo" projectName={project.name} routeContext={routeContext} />

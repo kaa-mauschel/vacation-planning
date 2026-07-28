@@ -4,15 +4,16 @@ import { useState } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { getAiSuggestions } from "@/lib/aiSuggestions";
-import { getStoredApiKey } from "@/lib/theme";
-import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2 } from "lucide-react";
+import { calculateDistanceTo } from "@/lib/routing";
+import { SECTIONS } from "@/lib/types";
+import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home } from "lucide-react";
 import Link from "next/link";
 
 function mapsSearchLink(name: string, context: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${context}`)}`;
 }
 
-const EMPTY_FORM = { name: "", type: "", group: "", note: "", context: "", rating: "" };
+const EMPTY_FORM = { name: "", type: "", group: "", note: "", context: "", rating: "", unterkunftId: "", unterkunftName: "", distance: "" };
 
 export default function GenericCardList({
   projectId,
@@ -32,14 +33,17 @@ export default function GenericCardList({
   routeContext?: string;
 }) {
   const { items, loading, addItem, updateItem, deleteItem } = useItems(projectId, section);
+  const { items: unterkuenfte } = useItems(projectId, SECTIONS.UNTERKUNFT);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (group: string) => setCollapsed({ ...collapsed, [group]: !collapsed[group] });
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
-
 
   const groups = Array.from(new Set(items.map((it) => it.data.group || "Allgemein")));
 
@@ -48,6 +52,7 @@ export default function GenericCardList({
     setEditForm({
       name: it.data.name || "", type: it.data.type || "", group: it.data.group || "",
       note: it.data.note || "", context: it.data.context || "", rating: it.data.rating || "",
+      unterkunftId: it.data.unterkunftId || "", unterkunftName: it.data.unterkunftName || "", distance: it.data.distance || "",
     });
   };
 
@@ -98,12 +103,12 @@ export default function GenericCardList({
         </div>
       )}
 
-
       {showForm && (
         <CardForm
           form={EMPTY_FORM}
           groupLabel={groupLabel}
           extraFieldLabel={extraFieldLabel}
+          accommodations={unterkuenfte}
           onCancel={() => setShowForm(false)}
           onSave={async (data) => { await addItem(data); setShowForm(false); }}
         />
@@ -115,9 +120,20 @@ export default function GenericCardList({
 
       {groups.map((group) => {
         const groupItems = items.filter((it) => (it.data.group || "Allgemein") === group);
+        const isCollapsed = !!collapsed[group];
         return (
           <div key={group}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17, marginBottom: 10 }}>{group}</div>
+            <button
+              onClick={() => toggleGroup(group)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, marginBottom: isCollapsed ? 0 : 10, cursor: "pointer" }}
+            >
+              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>{group}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#9A9384" }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{groupItems.length}</span>
+                {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </span>
+            </button>
+            {!isCollapsed && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {groupItems.map((it) => {
                 if (editingId === it.id) {
@@ -127,6 +143,7 @@ export default function GenericCardList({
                       form={editForm}
                       groupLabel={groupLabel}
                       extraFieldLabel={extraFieldLabel}
+                      accommodations={unterkuenfte}
                       onChange={setEditForm}
                       onCancel={() => setEditingId(null)}
                       onSave={() => saveEdit(it)}
@@ -159,6 +176,20 @@ export default function GenericCardList({
                       </div>
                     </div>
                     {it.data.note && <p style={{ fontSize: 13.5, color: "#4A453C", lineHeight: 1.55, margin: "8px 0 0" }}>{it.data.note}</p>}
+                    {(it.data.unterkunftName || it.data.distance) && (
+                      <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+                        {it.data.unterkunftName && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 9px", borderRadius: 20, background: "#EFEADC", color: "#6B6558", fontWeight: 600 }}>
+                            <Home size={11} /> {it.data.unterkunftName}
+                          </span>
+                        )}
+                        {it.data.distance && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 9px", borderRadius: 20, background: "#EFEADC", color: "#6B6558", fontWeight: 600 }}>
+                            <Ruler size={11} /> {it.data.distance}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <a
                       href={mapsSearchLink(it.data.name, it.data.context || group)}
                       target="_blank"
@@ -171,6 +202,7 @@ export default function GenericCardList({
                 );
               })}
             </div>
+            )}
           </div>
         );
       })}
@@ -185,6 +217,7 @@ function CardForm({
   onCancel,
   groupLabel,
   extraFieldLabel,
+  accommodations,
 }: {
   form: typeof EMPTY_FORM;
   onChange?: (f: typeof EMPTY_FORM) => void;
@@ -192,11 +225,31 @@ function CardForm({
   onCancel: () => void;
   groupLabel: string;
   extraFieldLabel: string;
+  accommodations: any[];
 }) {
   const [local, setLocal] = useState(form);
+  const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState("");
   const set = (next: typeof EMPTY_FORM) => {
     setLocal(next);
     onChange?.(next);
+  };
+
+  const selectedAccommodation = accommodations.find((a) => a.id === local.unterkunftId);
+
+  const handleCalculateDistance = async () => {
+    if (!selectedAccommodation?.data.lat || !selectedAccommodation?.data.lon) {
+      setCalcError("Diese Unterkunft hat noch keine Koordinaten (im Tab Unterkünfte berechnen lassen).");
+      return;
+    }
+    const query = local.context.trim() || local.name.trim();
+    if (!query) { setCalcError("Bitte erst Name oder Ort/Kontext ausfüllen."); return; }
+    setCalculating(true);
+    setCalcError("");
+    const result = await calculateDistanceTo(query, parseFloat(selectedAccommodation.data.lat), parseFloat(selectedAccommodation.data.lon));
+    setCalculating(false);
+    if (result.error) { setCalcError(result.error); return; }
+    set({ ...local, distance: result.km });
   };
 
   return (
@@ -208,6 +261,40 @@ function CardForm({
         <input placeholder={extraFieldLabel} value={local.context} onChange={(e) => set({ ...local, context: e.target.value })} style={inputStyle} />
         <input placeholder="Bewertung (z. B. 4.8, optional)" value={local.rating} onChange={(e) => set({ ...local, rating: e.target.value })} style={inputStyle} />
         <textarea placeholder="Notiz (optional)" value={local.note} onChange={(e) => set({ ...local, note: e.target.value })} rows={2} style={inputStyle} />
+
+        {accommodations.length > 0 && (
+          <>
+            <select
+              value={local.unterkunftId}
+              onChange={(e) => {
+                const acc = accommodations.find((a) => a.id === e.target.value);
+                set({ ...local, unterkunftId: e.target.value, unterkunftName: acc?.data.station || "", distance: "" });
+              }}
+              style={inputStyle}
+            >
+              <option value="">Zugehörige Unterkunft (optional)</option>
+              {accommodations.map((a) => (
+                <option key={a.id} value={a.id}>{a.data.station}</option>
+              ))}
+            </select>
+            {local.unterkunftId && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={handleCalculateDistance}
+                  disabled={calculating}
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: `1px solid ${STYLE.accent4}`, background: "transparent", color: STYLE.accent4, fontSize: 12.5, fontWeight: 600, opacity: calculating ? 0.6 : 1 }}
+                >
+                  {calculating ? <Loader2 size={13} className="animate-spin" /> : <Ruler size={13} />}
+                  {calculating ? "Berechne…" : "Entfernung zur Unterkunft berechnen"}
+                </button>
+                {local.distance && <span style={{ fontSize: 12.5, fontWeight: 600, color: STYLE.accent, flexShrink: 0 }}>{local.distance}</span>}
+              </div>
+            )}
+            {calcError && <p style={{ fontSize: 11.5, color: STYLE.danger, margin: 0 }}>{calcError}</p>}
+          </>
+        )}
+
         <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
           <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", borderRadius: 9, border: "1px solid #E0D9C6", background: "transparent", fontSize: 13.5 }}>Abbrechen</button>
           <button

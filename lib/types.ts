@@ -32,6 +32,7 @@ export const SECTIONS = {
   TAGESPLAN: "tagesplan",
   TIPP: "tipp",
   NOTIZ: "notiz",
+  UMGEBUNG: "umgebung",
 } as const;
 
 // Land -> Flagge, für die Routen-Übersicht (einfache Zuordnung, erweiterbar)
