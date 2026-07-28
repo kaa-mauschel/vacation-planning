@@ -20,7 +20,7 @@ import Tipps from "@/components/Tipps";
 import ShareProject from "@/components/ShareProject";
 import {
   ArrowLeft, MapPin, Backpack, ClipboardList, Home, Wallet, Trees,
-  Utensils, Sparkles, Star, CalendarDays, Lightbulb, Share2, Pencil, X, LayoutGrid,
+  Utensils, Sparkles, Star, CalendarDays, Lightbulb, Share2, Pencil, X, LayoutGrid, Users,
 } from "lucide-react";
 
 const TABS = [
@@ -83,6 +83,16 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
   const { items: routeItems } = useItems(project.id, SECTIONS.ROUTE);
   const tabOrder = useTabOrder();
   const orderedTabs = tabOrder.map((id) => TABS.find((t) => t.id === id)).filter(Boolean) as typeof TABS;
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("project_members")
+      .select("*", { count: "exact", head: true })
+      .eq("project_id", project.id)
+      .then(({ count }) => setMemberCount(count ?? null));
+  }, [project.id]);
+
   const routeContext = routeItems
     .slice()
     .sort((a: any, b: any) => (a.data.date || "").localeCompare(b.data.date || ""))
@@ -99,8 +109,13 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
           <button onClick={() => router.push("/projects")} style={{ background: "none", border: "none", color: STYLE.headerText, display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: 0.75 }}>
             <ArrowLeft size={16} /> Meine Urlaube
           </button>
-          <button onClick={() => setShowShare(true)} style={{ background: "none", border: "none", color: STYLE.headerText, display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: 0.85 }}>
-            <Share2 size={16} /> Einladen
+          <button onClick={() => setShowShare(true)} style={{ background: "none", border: "none", color: STYLE.headerText, display: "flex", alignItems: "center", gap: 10, fontSize: 13, opacity: 0.85 }}>
+            {memberCount !== null && (
+              <span style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(58,53,48,0.1)", borderRadius: 20, padding: "3px 9px", fontSize: 12, fontWeight: 700 }}>
+                <Users size={12} /> {memberCount}
+              </span>
+            )}
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Share2 size={16} /> Einladen</span>
           </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
