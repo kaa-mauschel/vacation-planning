@@ -5,7 +5,7 @@ import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { getAiSuggestions } from "@/lib/aiSuggestions";
 import { calculateDistanceTo } from "@/lib/routing";
-import { SECTIONS } from "@/lib/types";
+import { SECTIONS, guessFlag } from "@/lib/types";
 import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home } from "lucide-react";
 import Link from "next/link";
 
@@ -45,7 +45,41 @@ export default function GenericCardList({
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
-  const groups = Array.from(new Set(items.map((it) => it.data.group || "Allgemein")));
+  // Gruppierung: Einträge mit verknüpfter Unterkunft werden nach Land + Unterkunft
+  // gruppiert und chronologisch nach Anreisedatum sortiert. Einträge ohne Verknüpfung
+  // behalten das freie "group"-Textfeld als Gruppe (unsortiert, danach angehängt).
+  const groupKeyOf = (it: any) => {
+    const acc = it.data.unterkunftId ? unterkuenfte.find((a) => a.id === it.data.unterkunftId) : null;
+    return acc ? `acc:${acc.id}` : `grp:${it.data.group || "Allgemein"}`;
+  };
+  const groupLabelOf = (it: any) => {
+    const acc = it.data.unterkunftId ? unterkuenfte.find((a) => a.id === it.data.unterkunftId) : null;
+    if (acc) {
+      const country = acc.data.country || "";
+      const flag = country ? guessFlag(country) : "";
+      return `${flag} ${country || "Unbekanntes Land"} (${acc.data.station})`.trim();
+    }
+    return it.data.group || "Allgemein";
+  };
+  const groupSortDateOf = (key: string) => {
+    if (!key.startsWith("acc:")) return null;
+    const accId = key.slice(4);
+    const acc = unterkuenfte.find((a) => a.id === accId);
+    return acc?.data.von || null;
+  };
+
+  const groupMeta: Record<string, { label: string; sortDate: string | null }> = {};
+  items.forEach((it) => {
+    const key = groupKeyOf(it);
+    if (!groupMeta[key]) groupMeta[key] = { label: groupLabelOf(it), sortDate: groupSortDateOf(key) };
+  });
+  const groups = Object.keys(groupMeta).sort((a, b) => {
+    const ga = groupMeta[a], gb = groupMeta[b];
+    if (ga.sortDate && gb.sortDate) return ga.sortDate.localeCompare(gb.sortDate);
+    if (ga.sortDate) return -1;
+    if (gb.sortDate) return 1;
+    return ga.label.localeCompare(gb.label);
+  });
 
   const startEdit = (it: any) => {
     setEditingId(it.id);
@@ -118,16 +152,17 @@ export default function GenericCardList({
         <p style={{ fontSize: 14, color: "#9A9384", textAlign: "center" }}>Noch keine Einträge – füg den ersten hinzu!</p>
       )}
 
-      {groups.map((group) => {
-        const groupItems = items.filter((it) => (it.data.group || "Allgemein") === group);
-        const isCollapsed = !!collapsed[group];
+      {groups.map((groupKey) => {
+        const groupItems = items.filter((it) => groupKeyOf(it) === groupKey);
+        const groupLabel2 = groupMeta[groupKey].label;
+        const isCollapsed = !!collapsed[groupKey];
         return (
-          <div key={group}>
+          <div key={groupKey}>
             <button
-              onClick={() => toggleGroup(group)}
+              onClick={() => toggleGroup(groupKey)}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, marginBottom: isCollapsed ? 0 : 10, cursor: "pointer" }}
             >
-              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>{group}</span>
+              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>{groupLabel2}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#9A9384" }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{groupItems.length}</span>
                 {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -191,7 +226,7 @@ export default function GenericCardList({
                       </div>
                     )}
                     <a
-                      href={mapsSearchLink(it.data.name, it.data.context || group)}
+                      href={mapsSearchLink(it.data.name, it.data.context || it.data.group || "")}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 9, fontSize: 12.5, fontWeight: 600, color: STYLE.accent, textDecoration: "none" }}
