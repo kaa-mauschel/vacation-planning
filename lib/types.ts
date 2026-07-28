@@ -59,4 +59,8 @@ export const PLACE_SYMBOLS = [
   { emoji: "🏛️", label: "Kultur" },
   { emoji: "⛷️", label: "Wintersport" },
   { emoji: "🏰", label: "Sehenswürdigkeit" },
+  { emoji: "🛑", label: "Zwischenhalt" },
+  { emoji: "🧑‍🤝‍🧑", label: "Freunde besuchen" },
+  { emoji: "🛏️", label: "Nur Übernachten" },
+  { emoji: "🏃", label: "Action/Sport" },
 ];

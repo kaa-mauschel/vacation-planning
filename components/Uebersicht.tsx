@@ -6,7 +6,7 @@ import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor } from "@/lib/theme";
-import { MapPin, Sparkles } from "lucide-react";
+import { MapPin, Sparkles, Home } from "lucide-react";
 
 // Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
 const RealMap = dynamic(() => import("./RealMap"), {
@@ -14,9 +14,23 @@ const RealMap = dynamic(() => import("./RealMap"), {
   loading: () => <div style={{ height: 340, display: "flex", alignItems: "center", justifyContent: "center", color: "#9A9384", fontSize: 13 }}>Karte wird geladen…</div>,
 });
 
+function nights(von: string, bis: string): number | null {
+  if (!von || !bis) return null;
+  const a = new Date(von + "T00:00:00").getTime();
+  const b = new Date(bis + "T00:00:00").getTime();
+  const n = Math.round((b - a) / (1000 * 60 * 60 * 24));
+  return n > 0 ? n : null;
+}
+
+function fmtDate(d: string) {
+  if (!d) return "";
+  return new Date(d + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 export default function Uebersicht({ projectId, startDate }: { projectId: string; startDate: string | null }) {
   const { items: routeItems, loading: routeLoading } = useItems(projectId, SECTIONS.ROUTE);
-  const { items: notizItems, loading: notizLoading, addItem: addNotiz, updateItem: updateNotiz } = useItems(projectId, SECTIONS.NOTIZ);
+  const { items: unterkunftItems, loading: unterkunftLoading } = useItems(projectId, SECTIONS.UNTERKUNFT);
+  const { items: notizItems, addItem: addNotiz, updateItem: updateNotiz } = useItems(projectId, SECTIONS.NOTIZ);
 
   const notiz = notizItems[0];
   const [notizText, setNotizText] = useState("");
@@ -33,67 +47,92 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     }
   };
 
-  // Reihenfolge kommt bereits sortiert nach position aus useItems (= die Reihenfolge,
-  // die im Route-Tab per Datum bzw. manuell mit den Pfeilen festgelegt wurde).
+  // Route-Etappen (Fahrten), sortiert nach der im Route-Tab festgelegten Reihenfolge.
   const sortedRoute = routeItems;
-
   const totalKm = sortedRoute.reduce((sum, it) => {
     const n = parseFloat(String(it.data.km || "").replace(/[^\d.,]/g, "").replace(",", "."));
     return sum + (isNaN(n) ? 0 : n);
   }, 0);
 
-  // Aus den Etappen (Fahrten) werden "Aufenthalte" pro Ort abgeleitet: Ankunft = Datum
-  // der Etappe, die dort ankommt; Abreise = Datum der nächsten Etappe, die von dort losfährt.
-  const stays = (() => {
-    if (sortedRoute.length === 0) return [];
-    const result: any[] = [];
-    const first = sortedRoute[0];
-    result.push({
-      id: `${first.id}-start`,
-      name: first.data.from,
-      lat: first.data.lat, lon: first.data.lon,
-      country: first.data.fromCountry || first.data.land,
-      symbol: first.data.symbol || "",
-      arrival: null,
-      departure: first.data.date || null,
-    });
-    sortedRoute.forEach((leg, i) => {
-      const next = sortedRoute[i + 1];
-      result.push({
-        id: `${leg.id}-end`,
-        name: leg.data.to,
-        lat: leg.data.toLat, lon: leg.data.toLon,
-        country: leg.data.toCountry,
-        symbol: next?.data.symbol || "",
-        arrival: leg.data.date || null,
-        departure: next?.data.date || null,
-      });
-    });
-    return result;
-  })();
+  // Die Karte & "wann wo wie lange" basiert auf den Unterkünften – die haben schon
+  // die richtigen An-/Abreisedaten. Nach Datum sortiert (Unterkünfte ohne Datum ans Ende).
+  const stays = [...unterkunftItems].sort((a, b) => {
+    if (a.data.von && b.data.von) return a.data.von.localeCompare(b.data.von);
+    if (a.data.von) return -1;
+    if (b.data.von) return 1;
+    return 0;
+  });
 
-  const geoStops = stays
-    .map((s, i) => ({ ...s, listNumber: i + 1 }))
+  const geoStays = stays
+    .map((it, i) => ({
+      id: it.id,
+      name: it.data.station,
+      lat: it.data.lat, lon: it.data.lon,
+      country: it.data.country,
+      symbol: it.data.symbol || "",
+      arrival: it.data.von || null,
+      departure: it.data.bis || null,
+      listNumber: i + 1,
+    }))
     .filter((s) => s.lat && s.lon);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {startDate && <Countdown startDate={startDate} />}
 
-      {geoStops.length >= 2 && (
+      {geoStays.length >= 2 && (
         <div style={cardStyle}>
-          <SectionTitle icon={MapPin} text="Landkarte mit eurer Route" />
+          <SectionTitle icon={MapPin} text="Landkarte mit euren Stationen" />
           <div style={{ marginTop: 10, borderRadius: 12, overflow: "hidden", background: STYLE.paperDim }}>
-            <RealMap stops={geoStops} accentColor={STYLE.accent} />
+            <RealMap stops={geoStays} accentColor={STYLE.accent} />
           </div>
           <p style={{ fontSize: 12, color: "#9A9384", margin: "8px 0 0" }}>
-            Die gestrichelte Linie zeigt die Luftlinie zwischen den Stationen, keine exakte Straßenführung. Auf die Nummern tippen zeigt Details.
+            Basiert auf den Unterkünften. Fehlt eine Station (z. B. das eigentliche Endziel), im Tab "Unterkünfte"
+            ergänzen und dort "Koordinaten & Land finden" klicken.
           </p>
         </div>
       )}
-      {geoStops.length < 2 && sortedRoute.length > 0 && (
+      {geoStays.length < 2 && stays.length > 0 && (
         <div style={{ ...cardStyle, fontSize: 13, color: "#9A9384" }}>
-          Trage bei mindestens 2 Etappen im Tab "Route" Koordinaten (lat/lon) ein, um hier eine Landkarte zu sehen.
+          Trage bei mindestens 2 Unterkünften im Tab "Unterkünfte" Koordinaten ein (Button "Koordinaten & Land finden"), um hier eine Landkarte zu sehen.
+        </div>
+      )}
+      {stays.length === 0 && !unterkunftLoading && (
+        <div style={{ ...cardStyle, fontSize: 13, color: "#9A9384" }}>
+          Noch keine Unterkünfte eingetragen – im Tab "Unterkünfte" hinzufügen, dann erscheinen sie hier mit Karte und Aufenthaltsdauer.
+        </div>
+      )}
+
+      {stays.length > 0 && (
+        <div style={cardStyle}>
+          <SectionTitle icon={Home} text="Wo & wie lange" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+            {stays.map((it, i) => {
+              const n = nights(it.data.von, it.data.bis);
+              return (
+                <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", background: STYLE.paperDim, borderRadius: 10 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: "50%", background: it.data.lat && it.data.lon ? STYLE.accent : "#D8D2C4",
+                    color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    {i + 1}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                      {it.data.country ? guessFlag(it.data.country) : ""} {it.data.symbol || ""} {it.data.station}
+                    </div>
+                    {(it.data.von || it.data.bis) && (
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558", marginTop: 1 }}>
+                        {fmtDate(it.data.von)}{it.data.von && it.data.bis ? " – " : ""}{fmtDate(it.data.bis)}
+                        {n ? ` · ${n} ${n === 1 ? "Nacht" : "Nächte"}` : ""}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -197,5 +236,3 @@ function Countdown({ startDate }: { startDate: string }) {
     </div>
   );
 }
-
-
