@@ -167,6 +167,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
   const [name, setName] = useState(project.name);
   const [emoji, setEmoji] = useState(project.emoji);
   const [startDate, setStartDate] = useState(project.start_date || "");
+  const [endDate, setEndDate] = useState(project.end_date || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -176,7 +177,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
     setError("");
     const { error } = await supabase
       .from("projects")
-      .update({ name: name.trim(), emoji, start_date: startDate || null })
+      .update({ name: name.trim(), emoji, start_date: startDate || null, end_date: endDate || null })
       .eq("id", project.id);
     setSaving(false);
     if (error) {
@@ -200,13 +201,21 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
           onChange={(e) => setName(e.target.value)}
           style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginTop: 6, marginBottom: 14 }}
         />
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Abfahrtsdatum (für den Countdown)</label>
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginTop: 6, marginBottom: 14 }}
-        />
+        <label style={{ fontSize: 13, fontWeight: 600 }}>Zeitraum (Start = Countdown-Ziel)</label>
+        <div style={{ display: "flex", gap: 8, marginTop: 6, marginBottom: 14 }}>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, minWidth: 0 }}
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, minWidth: 0 }}
+          />
+        </div>
         <label style={{ fontSize: 13, fontWeight: 600 }}>Symbol</label>
         <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 18, flexWrap: "wrap" }}>
           {EMOJIS.map((e) => (

@@ -6,6 +6,7 @@ export type Project = {
   invite_code: string;
   created_at: string;
   start_date: string | null;
+  end_date: string | null;
 };
 
 export type Item = {

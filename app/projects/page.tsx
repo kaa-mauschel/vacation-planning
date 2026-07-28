@@ -7,9 +7,26 @@ import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT, cardStyle } from "@/lib/style";
 import { useHeaderColor } from "@/lib/theme";
 import type { Project } from "@/lib/types";
-import { Plus, LogOut, Users, X, Luggage, Settings } from "lucide-react";
+import { Plus, LogOut, Users, X, Luggage, Settings, CalendarDays } from "lucide-react";
 
 const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒", "🚗", "✈️"];
+
+function fmtDate(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function daysBetween(a: string, b: string) {
+  return Math.round((new Date(b + "T00:00:00").getTime() - new Date(a + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getStatus(start: string | null, end: string | null): { label: string; bg: string; color: string } {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!start && !end) return { label: "Kein Termin", bg: "#EFEADC", color: "#9A9384" };
+  if (start && today < start) return { label: "Bevorstehend", bg: "#E4EFE7", color: STYLE.accent };
+  if (end && today > end) return { label: "Vorbei", bg: "#EFEADC", color: "#9A9384" };
+  if (start && (!end || today <= end)) return { label: "Läuft gerade", bg: "#F7E7CE", color: "#8A5A1E" };
+  return { label: "Kein Termin", bg: "#EFEADC", color: "#9A9384" };
+}
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -26,7 +43,15 @@ export default function ProjectsPage() {
 
   const loadProjects = async () => {
     const { data } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
-    setProjects((data as Project[]) || []);
+    const list = (data as Project[]) || [];
+    // Sortierung: erst nach Startdatum (bevorstehende/laufende zuerst), Projekte ohne Datum ans Ende
+    list.sort((a, b) => {
+      if (a.start_date && b.start_date) return a.start_date.localeCompare(b.start_date);
+      if (a.start_date) return -1;
+      if (b.start_date) return 1;
+      return b.created_at.localeCompare(a.created_at);
+    });
+    setProjects(list);
     setLoadingProjects(false);
   };
 
@@ -89,23 +114,37 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {projects.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => router.push(`/projects/${p.id}`)}
-                style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 14, textAlign: "left", border: "none", width: "100%" }}
-              >
-                <div style={{ fontSize: 28 }}>{p.emoji}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15.5 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: "#9A9384", marginTop: 2 }}>
-                    {p.start_date
-                      ? `Start: ${new Date(p.start_date).toLocaleDateString("de-DE")}`
-                      : `Angelegt am ${new Date(p.created_at).toLocaleDateString("de-DE")}`}
+            {projects.map((p) => {
+              const status = getStatus(p.start_date, p.end_date);
+              const dur = p.start_date && p.end_date ? daysBetween(p.start_date, p.end_date) : null;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => router.push(`/projects/${p.id}`)}
+                  style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 14, textAlign: "left", border: "none", width: "100%" }}
+                >
+                  <div style={{ fontSize: 28, flexShrink: 0 }}>{p.emoji}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 700, fontSize: 15.5 }}>{p.name}</div>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: status.bg, color: status.color, flexShrink: 0 }}>
+                        {status.label}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#9A9384", marginTop: 3, display: "flex", alignItems: "center", gap: 5 }}>
+                      <CalendarDays size={12} />
+                      {p.start_date && p.end_date ? (
+                        <span>{fmtDate(p.start_date)} – {fmtDate(p.end_date)} · {dur} {dur === 1 ? "Tag" : "Tage"}</span>
+                      ) : p.start_date ? (
+                        <span>ab {fmtDate(p.start_date)}</span>
+                      ) : (
+                        <span>Angelegt am {new Date(p.created_at).toLocaleDateString("de-DE")}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -120,6 +159,7 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -130,7 +170,7 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
 
     const { error: insertError } = await supabase
       .from("projects")
-      .insert({ name: name.trim(), emoji, created_by: userId, start_date: startDate || null });
+      .insert({ name: name.trim(), emoji, created_by: userId, start_date: startDate || null, end_date: endDate || null });
 
     if (insertError) {
       setSaving(false);
@@ -154,13 +194,21 @@ function NewProjectModal({ onClose, onCreated, userId }: { onClose: () => void; 
         onChange={(e) => setName(e.target.value)}
         style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginTop: 6, marginBottom: 14 }}
       />
-      <label style={{ fontSize: 13, fontWeight: 600 }}>Abfahrtsdatum (optional, für den Countdown)</label>
-      <input
-        type="date"
-        value={startDate}
-        onChange={(e) => setStartDate(e.target.value)}
-        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginTop: 6, marginBottom: 14 }}
-      />
+      <label style={{ fontSize: 13, fontWeight: 600 }}>Zeitraum (optional, für Countdown & Übersicht)</label>
+      <div style={{ display: "flex", gap: 8, marginTop: 6, marginBottom: 14 }}>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, minWidth: 0 }}
+        />
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, minWidth: 0 }}
+        />
+      </div>
       <label style={{ fontSize: 13, fontWeight: 600 }}>Symbol</label>
       <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {EMOJIS.map((e) => (
