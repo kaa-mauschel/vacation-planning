@@ -1,11 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor } from "@/lib/theme";
 import { MapPin, Sparkles } from "lucide-react";
+
+// Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
+const RealMap = dynamic(() => import("./RealMap"), {
+  ssr: false,
+  loading: () => <div style={{ height: 340, display: "flex", alignItems: "center", justifyContent: "center", color: "#9A9384", fontSize: 13 }}>Karte wird geladen…</div>,
+});
 
 export default function Uebersicht({ projectId, startDate }: { projectId: string; startDate: string | null }) {
   const { items: routeItems, loading: routeLoading } = useItems(projectId, SECTIONS.ROUTE);
@@ -35,7 +42,9 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     return sum + (isNaN(n) ? 0 : n);
   }, 0);
 
-  const geoStops = sortedRoute.filter((it) => it.data.lat && it.data.lon);
+  const geoStops = sortedRoute
+    .map((it, i) => ({ ...it, listNumber: i + 1 }))
+    .filter((it) => it.data.lat && it.data.lon);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -45,10 +54,10 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
         <div style={cardStyle}>
           <SectionTitle icon={MapPin} text="Landkarte mit eurer Route" />
           <div style={{ marginTop: 10, borderRadius: 12, overflow: "hidden", background: STYLE.paperDim }}>
-            <RouteMap stops={geoStops} />
+            <RealMap stops={geoStops} accentColor={STYLE.accent} />
           </div>
           <p style={{ fontSize: 12, color: "#9A9384", margin: "8px 0 0" }}>
-            Schematische Übersicht (Luftlinie), keine exakte Straßenführung.
+            Die gestrichelte Linie zeigt die Luftlinie zwischen den Stationen, keine exakte Straßenführung. Auf die Nummern tippen zeigt Details.
           </p>
         </div>
       )}
@@ -67,12 +76,19 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
         ) : (
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-              {sortedRoute.map((it) => (
-                <div key={it.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 11px", background: STYLE.paperDim, borderRadius: 10 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 600 }}>
+              {sortedRoute.map((it, i) => (
+                <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", background: STYLE.paperDim, borderRadius: 10 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: "50%", background: it.data.lat && it.data.lon ? STYLE.accent : "#D8D2C4",
+                    color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>
                     {(it.data.fromCountry || it.data.land) ? guessFlag(it.data.fromCountry || it.data.land) : ""} {it.data.symbol || ""} {it.data.from} → {it.data.to}
                   </span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558", flexShrink: 0 }}>
                     {it.data.km ? `${it.data.km}` : ""}{it.data.h ? ` · ${it.data.h}` : ""}
                   </span>
                 </div>
@@ -152,63 +168,4 @@ function Countdown({ startDate }: { startDate: string }) {
   );
 }
 
-function RouteMap({ stops }: { stops: any[] }) {
-  const width = 340;
-  const height = 420;
-  const lats = stops.map((s) => parseFloat(s.data.lat));
-  const lons = stops.map((s) => parseFloat(s.data.lon));
-  const latMin = Math.min(...lats) - 1, latMax = Math.max(...lats) + 1;
-  const lonMin = Math.min(...lons) - 1, lonMax = Math.max(...lons) + 1;
 
-  const project = (lat: number, lon: number): [number, number] => {
-    const x = 20 + ((lon - lonMin) / (lonMax - lonMin || 1)) * (width - 40);
-    const y = 20 + ((latMax - lat) / (latMax - latMin || 1)) * (height - 40);
-    return [x, y];
-  };
-
-  const points = stops.map((s) => project(parseFloat(s.data.lat), parseFloat(s.data.lon)));
-  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", display: "block" }}>
-      <path d={pathD} fill="none" stroke={STYLE.ink} strokeWidth="2.5" strokeDasharray="6 6" opacity="0.35" />
-      {stops.map((s, i) => {
-        const [x, y] = points[i];
-        const labelRight = x < width / 2;
-        const labelUp = i % 2 === 0; // Labels abwechselnd über/unter dem Punkt gegen Überlappung
-        const labelY = labelUp ? y - 14 : y + 20;
-        const flagCountry = s.data.fromCountry || s.data.land;
-        const labelText = `${flagCountry ? guessFlag(flagCountry) : ""}${s.data.symbol ? " " + s.data.symbol : ""} ${s.data.from}`.trim();
-        const approxWidth = labelText.length * 6.5 + 10;
-        return (
-          <g key={s.id}>
-            <rect
-              x={labelRight ? x + 8 : x - 8 - approxWidth}
-              y={labelY - 11}
-              width={approxWidth}
-              height={16}
-              rx={5}
-              fill={STYLE.paper}
-              opacity="0.88"
-            />
-            <text
-              x={labelRight ? x + 12 : x - 12}
-              y={labelY}
-              fontSize="11.5"
-              fontFamily="'Inter', sans-serif"
-              fontWeight="700"
-              fill={STYLE.ink}
-              textAnchor={labelRight ? "start" : "end"}
-            >
-              {labelText}
-            </text>
-            <circle cx={x} cy={y} r="9" fill={STYLE.accent} stroke={STYLE.paper} strokeWidth="2.5" />
-            <text x={x} y={y + 3.5} fontSize="9" fontFamily="'JetBrains Mono', monospace" fontWeight="700" fill="#fff" textAnchor="middle">
-              {i + 1}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
