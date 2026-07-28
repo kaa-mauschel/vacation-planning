@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
-import { Check, Plus } from "lucide-react";
+import { Check, Plus, Pencil, X } from "lucide-react";
 
 export default function GenericChecklist({ projectId, section }: { projectId: string; section: string }) {
   const { items, loading, addItem, updateItem, deleteItem } = useItems(projectId, section);
@@ -11,6 +11,8 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const [editingCat, setEditingCat] = useState<string | null>(null);
+  const [editingCatText, setEditingCatText] = useState("");
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
@@ -32,6 +34,21 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
     setNewCategory("");
   };
 
+  // Kategorie umbenennen = bei allen Punkten dieser Kategorie das category-Feld ändern
+  const renameCategory = async (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) { setEditingCat(null); return; }
+    const catItems = items.filter((it) => (it.data.category || "Sonstiges") === oldName);
+    await Promise.all(catItems.map((it) => updateItem(it.id, { ...it.data, category: trimmed })));
+    setEditingCat(null);
+  };
+
+  // Ganze Kategorie löschen = alle enthaltenen Punkte löschen
+  const deleteCategory = async (cat: string) => {
+    const catItems = items.filter((it) => (it.data.category || "Sonstiges") === cat);
+    await Promise.all(catItems.map((it) => deleteItem(it.id)));
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
@@ -46,9 +63,29 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
 
       {categories.map((cat) => {
         const catItems = items.filter((it) => (it.data.category || "Sonstiges") === cat);
+        const isEditingCat = editingCat === cat;
         return (
           <div key={cat} style={cardStyle}>
-            <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 10 }}>{cat}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              {isEditingCat ? (
+                <input
+                  autoFocus
+                  value={editingCatText}
+                  onChange={(e) => setEditingCatText(e.target.value)}
+                  onBlur={() => renameCategory(cat, editingCatText)}
+                  onKeyDown={(e) => { if (e.key === "Enter") renameCategory(cat, editingCatText); if (e.key === "Escape") setEditingCat(null); }}
+                  style={{ flex: 1, minWidth: 0, padding: "5px 8px", borderRadius: 7, border: `1px solid ${STYLE.accent}`, fontSize: 14.5, fontWeight: 700 }}
+                />
+              ) : (
+                <div style={{ fontWeight: 700, fontSize: 14.5, flex: 1 }}>{cat}</div>
+              )}
+              <button onClick={() => { setEditingCat(cat); setEditingCatText(cat); }} style={{ background: "none", border: "none", color: "#9A9384" }}>
+                <Pencil size={14} />
+              </button>
+              <button onClick={() => deleteCategory(cat)} aria-label={`Kategorie ${cat} löschen`} style={{ background: "none", border: "none", color: "#B8AF9C" }}>
+                <X size={16} />
+              </button>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {catItems.map((it) => {
                 const checked = !!it.data.checked;
