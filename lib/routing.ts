@@ -40,26 +40,33 @@ export function formatHours(hours: number): string {
 }
 
 // Führt Geocoding + Routenberechnung für eine Etappe in einem Schritt aus.
-// Gibt zusätzlich das automatisch erkannte Land des Startpunkts zurück (für die
-// korrekte Flagge auf der Karte).
+// Gibt Koordinaten & erkanntes Land für BEIDE Punkte zurück (Start und Ziel) –
+// so lässt sich später auch der Zielort auf der Karte anzeigen und die
+// Aufenthaltsdauer pro Ort berechnen.
 export async function calculateLeg(fromQuery: string, toQuery: string): Promise<{
-  km: string; h: string; lat: string; lon: string; fromCountry: string; error?: string;
+  km: string; h: string;
+  lat: string; lon: string; fromCountry: string;
+  toLat: string; toLon: string; toCountry: string;
+  error?: string;
 }> {
+  const empty = { km: "", h: "", lat: "", lon: "", fromCountry: "", toLat: "", toLon: "", toCountry: "" };
   const from = await geocode(fromQuery);
-  if (!from) return { km: "", h: "", lat: "", lon: "", fromCountry: "", error: `"${fromQuery}" konnte nicht gefunden werden.` };
+  if (!from) return { ...empty, error: `"${fromQuery}" konnte nicht gefunden werden.` };
   // Kurze Pause, um die kostenlose Nominatim-Nutzungsrichtlinie (max. 1 Anfrage/Sek.) einzuhalten
   await new Promise((r) => setTimeout(r, 1000));
   const to = await geocode(toQuery);
-  if (!to) return { km: "", h: "", lat: String(from.lat), lon: String(from.lon), fromCountry: from.country, error: `"${toQuery}" konnte nicht gefunden werden.` };
+  if (!to) return { ...empty, lat: String(from.lat), lon: String(from.lon), fromCountry: from.country, error: `"${toQuery}" konnte nicht gefunden werden.` };
 
   const route = await getDrivingRoute(from, to);
-  if (!route) return { km: "", h: "", lat: String(from.lat), lon: String(from.lon), fromCountry: from.country, error: "Route konnte nicht berechnet werden." };
+  const base = {
+    lat: String(from.lat), lon: String(from.lon), fromCountry: from.country,
+    toLat: String(to.lat), toLon: String(to.lon), toCountry: to.country,
+  };
+  if (!route) return { ...empty, ...base, error: "Route konnte nicht berechnet werden." };
 
   return {
+    ...base,
     km: `≈ ${Math.round(route.km)} km`,
     h: `≈ ${formatHours(route.hours)}`,
-    lat: String(from.lat),
-    lon: String(from.lon),
-    fromCountry: from.country,
   };
 }

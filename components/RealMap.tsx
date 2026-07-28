@@ -26,8 +26,13 @@ function numberedIcon(num: number, color: string) {
   });
 }
 
+function fmtDate(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+}
+
+// Jeder "stop" ist ein Aufenthalt an einem Ort: { name, lat, lon, country, symbol, arrival, departure, listNumber }
 export default function RealMap({ stops, accentColor }: { stops: any[]; accentColor: string }) {
-  const positions: [number, number][] = stops.map((s) => [parseFloat(s.data.lat), parseFloat(s.data.lon)]);
+  const positions: [number, number][] = stops.map((s) => [parseFloat(s.lat), parseFloat(s.lon)]);
   if (positions.length === 0) return null;
 
   const center: [number, number] = [
@@ -50,22 +55,22 @@ export default function RealMap({ stops, accentColor }: { stops: any[]; accentCo
       />
       <Polyline positions={positions} pathOptions={{ color: "#3A3530", weight: 3, dashArray: "6 8", opacity: 0.55 }} />
       {stops.map((s, i) => {
-        const flagCountry = s.data.fromCountry || s.data.land;
+        let dateRange = "";
+        if (s.arrival && s.departure) dateRange = `${fmtDate(s.arrival)} – ${fmtDate(s.departure)}`;
+        else if (s.departure) dateRange = `ab ${fmtDate(s.departure)}`;
+        else if (s.arrival) dateRange = `ab ${fmtDate(s.arrival)}`;
+
         return (
           <Marker
             key={s.id}
-            position={[parseFloat(s.data.lat), parseFloat(s.data.lon)]}
+            position={[parseFloat(s.lat), parseFloat(s.lon)]}
             icon={numberedIcon(s.listNumber ?? i + 1, accentColor)}
           >
             <Popup>
               <strong>
-                {flagCountry ? guessFlag(flagCountry) : ""} {s.data.symbol || ""} {s.data.from}
+                {s.country ? guessFlag(s.country) : ""} {s.symbol || ""} {s.name}
               </strong>
-              {s.data.date && (
-                <div style={{ fontSize: 12, marginTop: 2 }}>
-                  {new Date(s.data.date).toLocaleDateString("de-DE")}
-                </div>
-              )}
+              {dateRange && <div style={{ fontSize: 12, marginTop: 2 }}>{dateRange}</div>}
             </Popup>
           </Marker>
         );

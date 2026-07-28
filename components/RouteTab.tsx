@@ -11,7 +11,7 @@ function mapsDirectionsLink(from: string, to: string) {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=driving`;
 }
 
-const EMPTY_FORM = { from: "", fromAddress: "", to: "", toAddress: "", date: "", km: "", h: "", land: "", fromCountry: "", symbol: "", lat: "", lon: "" };
+const EMPTY_FORM = { from: "", fromAddress: "", to: "", toAddress: "", date: "", km: "", h: "", land: "", fromCountry: "", toLat: "", toLon: "", toCountry: "", symbol: "", lat: "", lon: "" };
 
 export default function RouteTab({ projectId }: { projectId: string }) {
   const { items, loading, addItem, updateItem, deleteItem, reload } = useItems(projectId, "route");
@@ -84,7 +84,10 @@ export default function RouteTab({ projectId }: { projectId: string }) {
       setCalcError(result.error);
       return;
     }
-    setForm({ ...form, km: result.km, h: result.h, lat: result.lat, lon: result.lon, fromCountry: result.fromCountry, land: result.fromCountry || form.land });
+    setForm({
+      ...form, km: result.km, h: result.h, lat: result.lat, lon: result.lon, fromCountry: result.fromCountry,
+      land: result.fromCountry || form.land, toLat: result.toLat, toLon: result.toLon, toCountry: result.toCountry,
+    });
   };
 
   const handleCalculateEdit = async () => {
@@ -96,7 +99,10 @@ export default function RouteTab({ projectId }: { projectId: string }) {
     const result = await calculateLeg(fromQuery, toQuery);
     setCalculating(false);
     if (result.error) { setCalcError(result.error); return; }
-    setEditForm({ ...editForm, km: result.km, h: result.h, lat: result.lat, lon: result.lon, fromCountry: result.fromCountry, land: result.fromCountry || editForm.land });
+    setEditForm({
+      ...editForm, km: result.km, h: result.h, lat: result.lat, lon: result.lon, fromCountry: result.fromCountry,
+      land: result.fromCountry || editForm.land, toLat: result.toLat, toLon: result.toLon, toCountry: result.toCountry,
+    });
   };
 
   const startEdit = (it: any) => {
@@ -107,6 +113,7 @@ export default function RouteTab({ projectId }: { projectId: string }) {
       date: it.data.date || "", km: it.data.km || "", h: it.data.h || "",
       land: it.data.land || "", fromCountry: it.data.fromCountry || "", symbol: it.data.symbol || "",
       lat: it.data.lat || "", lon: it.data.lon || "",
+      toLat: it.data.toLat || "", toLon: it.data.toLon || "", toCountry: it.data.toCountry || "",
     });
   };
 

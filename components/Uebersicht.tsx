@@ -42,9 +42,39 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     return sum + (isNaN(n) ? 0 : n);
   }, 0);
 
-  const geoStops = sortedRoute
-    .map((it, i) => ({ ...it, listNumber: i + 1 }))
-    .filter((it) => it.data.lat && it.data.lon);
+  // Aus den Etappen (Fahrten) werden "Aufenthalte" pro Ort abgeleitet: Ankunft = Datum
+  // der Etappe, die dort ankommt; Abreise = Datum der nächsten Etappe, die von dort losfährt.
+  const stays = (() => {
+    if (sortedRoute.length === 0) return [];
+    const result: any[] = [];
+    const first = sortedRoute[0];
+    result.push({
+      id: `${first.id}-start`,
+      name: first.data.from,
+      lat: first.data.lat, lon: first.data.lon,
+      country: first.data.fromCountry || first.data.land,
+      symbol: first.data.symbol || "",
+      arrival: null,
+      departure: first.data.date || null,
+    });
+    sortedRoute.forEach((leg, i) => {
+      const next = sortedRoute[i + 1];
+      result.push({
+        id: `${leg.id}-end`,
+        name: leg.data.to,
+        lat: leg.data.toLat, lon: leg.data.toLon,
+        country: leg.data.toCountry,
+        symbol: next?.data.symbol || "",
+        arrival: leg.data.date || null,
+        departure: next?.data.date || null,
+      });
+    });
+    return result;
+  })();
+
+  const geoStops = stays
+    .map((s, i) => ({ ...s, listNumber: i + 1 }))
+    .filter((s) => s.lat && s.lon);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
