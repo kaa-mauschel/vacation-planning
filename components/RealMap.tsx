@@ -58,13 +58,15 @@ export default function RealMap({ stops, accentColor }: { stops: any[]; accentCo
       />
       <Polyline positions={positions} pathOptions={{ color: "#3A3530", weight: 3, dashArray: "6 8", opacity: 0.55 }} />
       {stops.map((s, i) => {
+        const isStart = (s.listNumber ?? i + 1) === 1;
+        const stopLabel = isStart ? "Startpunkt" : "Zwischenstopp";
         let dateInfo = "";
         if (s.isStay && s.arrival && s.departure) dateInfo = `${fmtDate(s.arrival)} – ${fmtDate(s.departure)}`;
         else if (s.isStay && s.departure) dateInfo = `ab ${fmtDate(s.departure)}`;
         else if (s.isStay && s.arrival) dateInfo = `ab ${fmtDate(s.arrival)}`;
-        else if (s.departure) dateInfo = `Zwischenstopp · ${fmtDate(s.departure)}`;
-        else if (s.arrival) dateInfo = `Zwischenstopp · ${fmtDate(s.arrival)}`;
-        else dateInfo = "Zwischenstopp";
+        else if (s.departure) dateInfo = `${stopLabel} · ${fmtDate(s.departure)}`;
+        else if (s.arrival) dateInfo = `${stopLabel} · ${fmtDate(s.arrival)}`;
+        else dateInfo = stopLabel;
 
         return (
           <Marker

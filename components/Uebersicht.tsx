@@ -94,13 +94,13 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     }
   };
 
-  if (sortedRoute.length > 0) {
-    const first = sortedRoute[0];
-    pushChainPoint(first.data.from, first.data.lat, first.data.lon, first.data.fromCountry || first.data.land, first.data.symbol || "", first.data.date || null);
-    sortedRoute.forEach((leg) => {
-      pushChainPoint(leg.data.to, leg.data.toLat, leg.data.toLon, leg.data.toCountry, "", leg.data.date || null);
-    });
-  }
+  sortedRoute.forEach((leg) => {
+    // Von-Punkt jeder Etappe (deckt auch Fälle ab, wo beim "Nach" der vorherigen Etappe
+    // aus irgendeinem Grund keine Koordinaten gespeichert wurden)
+    pushChainPoint(leg.data.from, leg.data.lat, leg.data.lon, leg.data.fromCountry || leg.data.land, leg.data.symbol || "", leg.data.date || null);
+    // Nach-Punkt jeder Etappe
+    pushChainPoint(leg.data.to, leg.data.toLat, leg.data.toLon, leg.data.toCountry, "", leg.data.date || null);
+  });
 
   // Unterkünfte, die sich keiner Etappe zuordnen ließen (Name passt zu keiner Station),
   // hinten anhängen, nach Anreisedatum sortiert.
