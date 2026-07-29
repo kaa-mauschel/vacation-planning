@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT } from "@/lib/style";
-import { useHeaderColor, useTabOrder } from "@/lib/theme";
+import { useHeaderColor, useTabOrder, headerGradient } from "@/lib/theme";
 import { SECTIONS } from "@/lib/types";
 import { useItems } from "@/lib/useItems";
 import type { Project } from "@/lib/types";
@@ -104,7 +104,7 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
     <div style={{ minHeight: "100vh", background: STYLE.paperDim, paddingBottom: 40 }}>
       <style>{FONTS_IMPORT}</style>
 
-      <div style={{ background: headerColor, color: STYLE.headerText, padding: "20px 16px", boxShadow: "0 4px 14px -6px rgba(58,53,48,0.25)", position: "relative", zIndex: 1 }}>
+      <div style={{ background: headerGradient(headerColor), color: STYLE.headerText, padding: "20px 16px", boxShadow: "0 4px 14px -6px rgba(58,53,48,0.25)", position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => router.push("/projects")} style={{ background: "none", border: "none", color: STYLE.headerText, display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: 0.75 }}>
             <ArrowLeft size={16} /> Meine Urlaube

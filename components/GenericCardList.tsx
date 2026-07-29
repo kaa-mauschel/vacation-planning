@@ -7,7 +7,7 @@ import { getAiSuggestions } from "@/lib/aiSuggestions";
 import { calculateDistanceTo } from "@/lib/routing";
 import { SECTIONS, guessFlag } from "@/lib/types";
 import FlagIcon from "./FlagIcon";
-import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home } from "lucide-react";
+import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home, Compass } from "lucide-react";
 import Link from "next/link";
 
 function mapsSearchLink(name: string, context: string) {
@@ -167,7 +167,10 @@ export default function GenericCardList({
       )}
 
       {groups.length === 0 && !showForm && (
-        <p style={{ fontSize: 14, color: "#9A9384", textAlign: "center" }}>Noch keine Einträge – füg den ersten hinzu!</p>
+        <div style={{ textAlign: "center", padding: "28px 20px", color: "#B0A996" }}>
+          <Compass size={30} style={{ opacity: 0.6, marginBottom: 8 }} />
+          <p style={{ fontSize: 14, margin: 0 }}>Noch nichts hier – füg den ersten Eintrag hinzu!</p>
+        </div>
       )}
 
       {groups.map((groupKey) => {

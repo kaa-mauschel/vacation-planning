@@ -16,6 +16,24 @@ export const PASTEL_COLORS = [
 const STORAGE_KEY = "urlaubsplaner-header-color";
 const DEFAULT_COLOR = PASTEL_COLORS[0].value;
 
+// Hellt/dunkelt eine Hex-Farbe ab, für sanfte Farbverläufe (z. B. bei Kopfzeilen).
+// percent negativ = dunkler, positiv = heller.
+export function shadeColor(hex: string, percent: number): string {
+  const clean = hex.replace("#", "");
+  const num = parseInt(clean, 16);
+  let r = (num >> 16) + Math.round(255 * (percent / 100));
+  let g = ((num >> 8) & 0x00ff) + Math.round(255 * (percent / 100));
+  let b = (num & 0x0000ff) + Math.round(255 * (percent / 100));
+  r = Math.max(0, Math.min(255, r));
+  g = Math.max(0, Math.min(255, g));
+  b = Math.max(0, Math.min(255, b));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+export function headerGradient(hex: string): string {
+  return `linear-gradient(135deg, ${shadeColor(hex, 6)}, ${shadeColor(hex, -7)})`;
+}
+
 export function getStoredHeaderColor(): string {
   if (typeof window === "undefined") return DEFAULT_COLOR;
   return window.localStorage.getItem(STORAGE_KEY) || DEFAULT_COLOR;

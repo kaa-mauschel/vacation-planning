@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useItems } from "@/lib/useItems";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag, SECTIONS } from "@/lib/types";
-import { useHeaderColor } from "@/lib/theme";
+import { useHeaderColor, headerGradient } from "@/lib/theme";
 import { MapPin, Sparkles, Home } from "lucide-react";
 
 // Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
@@ -217,7 +217,7 @@ function Countdown({ startDate }: { startDate: string }) {
   const departed = diff <= 0;
 
   return (
-    <div style={{ background: headerColor, borderRadius: 16, padding: "18px 16px", color: STYLE.headerText }}>
+    <div style={{ background: headerGradient(headerColor), borderRadius: 16, padding: "18px 16px", color: STYLE.headerText }}>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: 1.5, opacity: 0.7, textTransform: "uppercase", marginBottom: 10 }}>
         {departed ? "Unterwegs seit" : "Abfahrt in"}
       </div>
