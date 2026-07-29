@@ -37,6 +37,14 @@ export default function Unterkuenfte({ projectId }: { projectId: string }) {
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
+  // Chronologisch nach Anreisedatum sortiert (ohne Datum ans Ende)
+  const sorted = [...items].sort((a, b) => {
+    if (a.data.von && b.data.von) return a.data.von.localeCompare(b.data.von);
+    if (a.data.von) return -1;
+    if (b.data.von) return 1;
+    return 0;
+  });
+
   const submit = () => {
     if (!form.station.trim()) return;
     addItem(form, items.length);
@@ -93,7 +101,7 @@ export default function Unterkuenfte({ projectId }: { projectId: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {items.map((it) => {
+      {sorted.map((it) => {
         const isEditing = editingId === it.id;
         const n = nights(it.data.von, it.data.bis);
         if (isEditing) {
