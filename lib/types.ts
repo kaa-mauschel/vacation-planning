@@ -41,7 +41,7 @@ export const PERSON_COLORS = ["#5B9279", "#E0A45C", "#5FA3AE", "#9584B8", "#D978
 export const PERSON_EMOJIS = ["🧑", "👩", "👨", "🧔", "👱‍♀️", "👱‍♂️", "🧑‍🦱", "👩‍🦰", "🧑‍🦰", "👩‍🦳", "🧑‍🦲", "👧", "👦", "👵", "👴", "🐶"];
 
 // Icons für Packlisten-/Vorabreise-Kategorien: Vorschlag anhand des Namens, plus freie Auswahl
-export const CATEGORY_ICONS = ["📄", "👕", "💊", "🔌", "🏠", "🛒", "🗂️", "🎒", "🧴", "🍼", "⚽", "🐾", "📷", "🕶️", "☂️", "📦", "🚴", "🏐", "🏋️", "💄"];
+export const CATEGORY_ICONS = ["📄", "👕", "💊", "🔌", "🏠", "🛒", "🗂️", "🎒", "🧴", "🍼", "⚽", "🐾", "📷", "🕶️", "☂️", "📦", "🚴", "🏐", "🏋️", "💄", "🌴", "👙"];
 
 const CATEGORY_ICON_HINTS: [string, string][] = [
   ["dokument", "📄"], ["ausweis", "📄"], ["papier", "📄"],
@@ -59,6 +59,8 @@ const CATEGORY_ICON_HINTS: [string, string][] = [
   ["volleyball", "🏐"],
   ["fitness", "🏋️"], ["training", "🏋️"], ["gym", "🏋️"],
   ["beauty", "💄"], ["kosmetik", "💄"], ["schminke", "💄"],
+  ["palme", "🌴"], ["strand", "🌴"],
+  ["badeanzug", "👙"], ["bikini", "👙"], ["bade", "👙"],
 ];
 
 export function guessCategoryIcon(name: string): string {
