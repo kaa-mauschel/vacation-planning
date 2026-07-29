@@ -72,47 +72,41 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
       departure: it.data.bis || null,
       isStay: true,
     }));
+  const stayByName = new Map(stayPoints.map((p) => [(p.name || "").trim().toLowerCase(), p]));
 
-  const stayNames = new Set(stayPoints.map((p) => (p.name || "").trim().toLowerCase()));
-
-  // Zusätzlich: kurze Zwischenstopps aus der Route (z. B. Ingolstadt auf dem Weg),
-  // die noch nicht schon als Unterkunft erfasst sind.
-  const routeStopPoints: any[] = [];
-  sortedRoute.forEach((leg, i) => {
-    const fromName = (leg.data.from || "").trim();
-    if (fromName && leg.data.lat && leg.data.lon && !stayNames.has(fromName.toLowerCase())) {
-      routeStopPoints.push({
-        id: `${leg.id}-from`,
-        name: leg.data.from,
-        lat: leg.data.lat, lon: leg.data.lon,
-        country: leg.data.fromCountry || leg.data.land,
-        symbol: leg.data.symbol || "",
-        arrival: null,
-        departure: leg.data.date || null,
-        isStay: false,
-      });
-      stayNames.add(fromName.toLowerCase());
+  // Die Reihenfolge kommt jetzt direkt aus der Verkettung der Route (Start = "Von" der
+  // allerersten Etappe, danach immer das "Nach" jeder weiteren Etappe der Reihe nach) –
+  // das ist eindeutig, unabhängig vom Datum, und entspricht genau dem, was im Route-Tab
+  // steht. Unterkünfte, deren Name zu einer Station passt, ersetzen den Punkt (mit
+  // Aufenthaltsdauer statt nur Durchreise-Datum).
+  const usedStayKeys = new Set<string>();
+  const chainPoints: any[] = [];
+  const pushChainPoint = (name: string, lat: string, lon: string, country: string, symbol: string, date: string | null) => {
+    if (!name || !lat || !lon) return;
+    const key = name.trim().toLowerCase();
+    if (chainPoints.length && chainPoints[chainPoints.length - 1].key === key) return; // gleicher Ort wie zuvor
+    const stay = stayByName.get(key);
+    if (stay) {
+      usedStayKeys.add(key);
+      chainPoints.push({ ...stay, key, isStay: true });
+    } else {
+      chainPoints.push({ id: `chain-${key}-${chainPoints.length}`, key, name, lat, lon, country, symbol, arrival: null, departure: date, isStay: false });
     }
-    // Letzte Etappe: auch das Fahrtziel zeigen, falls es noch nirgends erfasst ist
-    const toName = (leg.data.to || "").trim();
-    if (i === sortedRoute.length - 1 && toName && leg.data.toLat && leg.data.toLon && !stayNames.has(toName.toLowerCase())) {
-      routeStopPoints.push({
-        id: `${leg.id}-to`,
-        name: leg.data.to,
-        lat: leg.data.toLat, lon: leg.data.toLon,
-        country: leg.data.toCountry,
-        symbol: "",
-        arrival: leg.data.date || null,
-        departure: null,
-        isStay: false,
-      });
-      stayNames.add(toName.toLowerCase());
-    }
-  });
+  };
 
-  const combined = [...stayPoints, ...routeStopPoints].sort((a, b) =>
-    (a.arrival || a.departure || "").localeCompare(b.arrival || b.departure || "")
-  );
+  if (sortedRoute.length > 0) {
+    const first = sortedRoute[0];
+    pushChainPoint(first.data.from, first.data.lat, first.data.lon, first.data.fromCountry || first.data.land, first.data.symbol || "", first.data.date || null);
+    sortedRoute.forEach((leg) => {
+      pushChainPoint(leg.data.to, leg.data.toLat, leg.data.toLon, leg.data.toCountry, "", leg.data.date || null);
+    });
+  }
+
+  // Unterkünfte, die sich keiner Etappe zuordnen ließen (Name passt zu keiner Station),
+  // hinten anhängen, nach Anreisedatum sortiert.
+  const unmatchedStays = stayPoints.filter((p) => !usedStayKeys.has((p.name || "").trim().toLowerCase()));
+
+  const combined = [...chainPoints, ...unmatchedStays];
   const geoStays = combined.map((s, i) => ({ ...s, listNumber: i + 1 }));
 
   return (
