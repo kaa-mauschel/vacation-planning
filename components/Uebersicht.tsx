@@ -47,7 +47,10 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
     }
   };
 
-  const sortedRoute = routeItems;
+  // Reihenfolge exakt wie im Route-Tab (Position = dort festgelegte Reihenfolge, inkl.
+  // Datum + manuellem Verschieben) – wichtig bei mehreren Etappen am selben Tag,
+  // da sonst bei gleichem Datum keine eindeutige Reihenfolge bestünde.
+  const sortedRoute = [...routeItems].sort((a, b) => a.position - b.position);
 
   // "Wo & wie lange" basiert auf den Unterkünften (die haben die richtigen An-/Abreisedaten).
   const stays = [...unterkunftItems].sort((a, b) => {
