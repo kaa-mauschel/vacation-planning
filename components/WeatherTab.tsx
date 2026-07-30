@@ -48,10 +48,11 @@ function DayRow({ detail }: { detail: DayDetail }) {
 function StopWeather({ stop }: { stop: any }) {
   const [details, setDetails] = useState<DayDetail[] | null>(null);
 
-  // Bei einer Unterkunft: jeder Tag von Anreise bis Abreise. Bei einem reinen
-  // Zwischenstopp: nur der eine Tag, an dem man dort ist.
-  const dates = stop.isStay
-    ? datesBetween(stop.arrival, stop.departure || stop.arrival)
+  // Jeder Tag zwischen Ankunft und Abfahrt (bei einer Unterkunft normalerweise mehrere,
+  // bei einem Zwischenstopp mit Ankunfts- UND Abfahrtstag genau diese zwei, sonst nur der
+  // eine bekannte Tag).
+  const dates = stop.arrival && stop.departure
+    ? datesBetween(stop.arrival, stop.departure)
     : [stop.departure || stop.arrival].filter(Boolean);
 
   useEffect(() => {

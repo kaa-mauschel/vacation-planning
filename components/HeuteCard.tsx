@@ -5,6 +5,7 @@ import { useTripStops } from "@/lib/useTripStops";
 import { useItems } from "@/lib/useItems";
 import { getDayDetail, weatherInfo, type DayDetail } from "@/lib/weather";
 import { timeGreeting, timeEmoji } from "@/lib/greeting";
+import { useDisplayName } from "@/lib/profileName";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
@@ -28,6 +29,7 @@ function pickForToday<T>(items: T[]): T | null {
 
 export default function HeuteCard({ projectId }: { projectId: string }) {
   const headerColor = useHeaderColor();
+  const displayName = useDisplayName();
   const { stops, loading: stopsLoading } = useTripStops(projectId);
   const { items: aktivitaeten } = useItems(projectId, SECTIONS.AKTIVITAET);
   const { items: mustdos } = useItems(projectId, SECTIONS.MUSTDO);
@@ -80,7 +82,7 @@ export default function HeuteCard({ projectId }: { projectId: string }) {
   return (
     <div style={{ background: headerGradient(headerColor), borderRadius: 16, padding: "18px 16px", color: STYLE.headerText }}>
       <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>
-        {timeGreeting()}! {timeEmoji()}
+        {timeGreeting()}{displayName ? `, ${displayName}` : ""}! {timeEmoji()}
       </div>
       <div style={{ fontSize: 12.5, opacity: 0.75, marginTop: 2, textTransform: "capitalize" }}>{fmtDate(today)}</div>
 

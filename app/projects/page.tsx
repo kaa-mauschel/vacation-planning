@@ -8,6 +8,7 @@ import { STYLE, FONTS_IMPORT, cardStyle } from "@/lib/style";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
 import type { Project } from "@/lib/types";
 import { Plus, LogOut, Users, X, Luggage, Settings, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
+import NamePrompt from "@/components/NamePrompt";
 
 const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒", "🚗", "✈️"];
 
@@ -76,6 +77,7 @@ export default function ProjectsPage() {
   return (
     <div style={{ minHeight: "100vh", background: STYLE.paperDim }}>
       <style>{FONTS_IMPORT}</style>
+      <NamePrompt />
 
       <div style={{ background: headerGradient(headerColor), color: STYLE.headerText, padding: "24px 20px", boxShadow: "0 4px 14px -6px rgba(58,53,48,0.25)", position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

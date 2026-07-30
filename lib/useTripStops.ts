@@ -70,7 +70,16 @@ export function useTripStops(projectId: string) {
     const key = name.trim().toLowerCase();
     const stay = findMatchingStay(name);
     const dedupKey = stay ? `stay:${stay.id}` : key;
-    if (chainPoints.length && chainPoints[chainPoints.length - 1].dedupKey === dedupKey) return;
+    const last = chainPoints[chainPoints.length - 1];
+    if (last && last.dedupKey === dedupKey) {
+      // Gleicher Ort wie zuvor (z. B. Ankunft mit einer Etappe, Abfahrt mit der nächsten):
+      // Datum ergänzen statt den Punkt zu verwerfen, damit beide Tage erhalten bleiben.
+      if (!last.isStay) {
+        if (isArrival && !last.arrival) last.arrival = date;
+        if (!isArrival && !last.departure) last.departure = date;
+      }
+      return;
+    }
     if (stay) {
       chainPoints.push({ ...stay, key, dedupKey, isStay: true });
     } else {

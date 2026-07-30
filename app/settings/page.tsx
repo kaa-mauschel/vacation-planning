@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
 import { STYLE, FONTS_IMPORT, cardStyle } from "@/lib/style";
 import { PASTEL_COLORS, getStoredHeaderColor, setStoredHeaderColor, getStoredApiKey, setStoredApiKey, useHeaderColor, getStoredTabOrder, setStoredTabOrder, DEFAULT_TAB_ORDER } from "@/lib/theme";
-import { ArrowLeft, Check, Key, ExternalLink, GripVertical, ListOrdered } from "lucide-react";
+import { getStoredName, setStoredName } from "@/lib/profileName";
+import { ArrowLeft, Check, Key, ExternalLink, GripVertical, ListOrdered, User } from "lucide-react";
 
 const TAB_LABELS: Record<string, string> = {
   uebersicht: "Übersicht",
@@ -30,6 +31,8 @@ export default function SettingsPage() {
   const [selected, setSelected] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [savedHint, setSavedHint] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [nameSavedHint, setNameSavedHint] = useState(false);
   const [tabOrder, setTabOrder] = useState<string[]>(DEFAULT_TAB_ORDER);
   const dragIndexRef = useRef<number | null>(null);
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -39,6 +42,7 @@ export default function SettingsPage() {
     setSelected(getStoredHeaderColor());
     setApiKey(getStoredApiKey());
     setTabOrder(getStoredTabOrder());
+    setDisplayName(getStoredName());
   }, []);
 
   useEffect(() => {
@@ -107,6 +111,33 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ padding: "20px 16px", maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <User size={17} color={STYLE.ink} />
+            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>Dein Name</div>
+          </div>
+          <p style={{ fontSize: 13, color: "#6B6558", margin: "6px 0 12px" }}>
+            Damit dich die App persönlich begrüßen kann und deine Einträge richtig zugeordnet werden. Nur auf diesem Gerät gespeichert.
+          </p>
+          <input
+            type="text"
+            placeholder="Dein Name"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E0D9C6", fontSize: 14, marginBottom: 10 }}
+          />
+          <button
+            onClick={() => {
+              setStoredName(displayName.trim());
+              setNameSavedHint(true);
+              setTimeout(() => setNameSavedHint(false), 1800);
+            }}
+            style={{ padding: "10px 20px", borderRadius: 9, border: "none", background: STYLE.ink, color: "#fff", fontSize: 13.5, fontWeight: 600 }}
+          >
+            {nameSavedHint ? "Gespeichert ✓" : "Speichern"}
+          </button>
+        </div>
+
         <div style={cardStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <ListOrdered size={17} color={STYLE.ink} />
