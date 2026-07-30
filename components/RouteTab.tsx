@@ -262,14 +262,16 @@ export default function RouteTab({ projectId }: { projectId: string }) {
                   href={mapsDirectionsLink(it.data.fromAddress || it.data.from, it.data.toAddress || it.data.to)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", textDecoration: "none", color: "inherit", gap: 8, minWidth: 0 }}
+                  style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, textDecoration: "none", color: "inherit", minWidth: 0 }}
                 >
-                  <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0, flexWrap: "wrap" }}>
                     {flagCountry ? guessFlag(flagCountry) : ""} {it.data.symbol || ""} {it.data.from} → {it.data.to} <MapPin size={12} color={STYLE.accent4} />
                   </span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558", textAlign: "right", flexShrink: 0 }}>
-                    {it.data.date ? `${new Date(it.data.date).toLocaleDateString("de-DE")} · ` : ""}{it.data.km} {it.data.h && `· ${it.data.h}`}
-                  </span>
+                  {(it.data.date || it.data.km || it.data.h) && (
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558" }}>
+                      {it.data.date ? `${new Date(it.data.date).toLocaleDateString("de-DE")} · ` : ""}{it.data.km} {it.data.h && `· ${it.data.h}`}
+                    </span>
+                  )}
                 </a>
                 <button onClick={() => startEdit(it)} style={{ background: "none", border: "none", color: "#9A9384", flexShrink: 0 }}><Pencil size={14} /></button>
                 <button onClick={() => deleteItem(it.id)} style={{ background: "none", border: "none", color: "#B8AF9C", flexShrink: 0 }}><X size={15} /></button>

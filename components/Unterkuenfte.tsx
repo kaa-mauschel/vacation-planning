@@ -11,7 +11,7 @@ function mapsSearchLink(name: string, context: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${context}`)}`;
 }
 
-const EMPTY = { station: "", von: "", bis: "", name: "", link: "", verpflegung: "", extras: "", lat: "", lon: "", country: "", symbol: "" };
+const EMPTY = { station: "", von: "", bis: "", name: "", address: "", link: "", verpflegung: "", extras: "", lat: "", lon: "", country: "", symbol: "" };
 
 function fmtDate(d: string) {
   if (!d) return "";
@@ -56,7 +56,7 @@ export default function Unterkuenfte({ projectId }: { projectId: string }) {
     setEditingId(it.id);
     setEditForm({
       station: it.data.station || "", von: it.data.von || "", bis: it.data.bis || "",
-      name: it.data.name || "", link: it.data.link || "", verpflegung: it.data.verpflegung || "",
+      name: it.data.name || "", address: it.data.address || "", link: it.data.link || "", verpflegung: it.data.verpflegung || "",
       extras: it.data.extras || "", lat: it.data.lat || "", lon: it.data.lon || "",
       country: it.data.country || "", symbol: it.data.symbol || "",
     });
@@ -69,8 +69,8 @@ export default function Unterkuenfte({ projectId }: { projectId: string }) {
 
   const locate = async (target: "form" | "edit") => {
     const f = target === "form" ? form : editForm;
-    const query = f.name.trim() || f.station.trim();
-    if (!query) { setLocateError("Bitte erst Ort/Station oder Name der Unterkunft ausfüllen."); return; }
+    const query = f.address.trim() || f.name.trim() || f.station.trim();
+    if (!query) { setLocateError("Bitte erst Adresse, Name der Unterkunft oder Ort/Station ausfüllen."); return; }
     setLocating(true);
     setLocateError("");
     const result = await geocode(query);
@@ -113,6 +113,7 @@ export default function Unterkuenfte({ projectId }: { projectId: string }) {
                 <input type="date" value={editForm.bis} onChange={(e) => setEditForm({ ...editForm, bis: e.target.value })} style={inputStyle} />
               </div>
               <input placeholder="Name der Unterkunft" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} style={inputStyle} />
+              <input placeholder="Adresse (z. B. Orleansstraße 81-83, 81667 München)" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} style={inputStyle} />
               <button
                 type="button"
                 onClick={() => locate("edit")}
@@ -196,6 +197,7 @@ export default function Unterkuenfte({ projectId }: { projectId: string }) {
             <input type="date" value={form.bis} onChange={(e) => setForm({ ...form, bis: e.target.value })} style={inputStyle} />
           </div>
           <input placeholder="Name der Unterkunft" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle} />
+          <input placeholder="Adresse (z. B. Orleansstraße 81-83, 81667 München)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} style={inputStyle} />
           <button
             type="button"
             onClick={() => locate("form")}

@@ -21,6 +21,11 @@ export default function LoginPage() {
     if (!loading && user) router.replace("/projects");
   }, [loading, user, router]);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem("urlaubsplaner-last-email");
+    if (saved) setEmail(saved);
+  }, []);
+
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -52,6 +57,7 @@ export default function LoginPage() {
           : error.message);
         return;
       }
+      window.localStorage.setItem("urlaubsplaner-last-email", email);
       router.replace("/projects");
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password });
@@ -111,6 +117,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="du@beispiel.de"
@@ -127,6 +134,7 @@ export default function LoginPage() {
                   type="password"
                   required
                   minLength={6}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="mindestens 6 Zeichen"
