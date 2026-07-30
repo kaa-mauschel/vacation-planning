@@ -8,6 +8,7 @@ import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
 import { MapPin, Sparkles, Home } from "lucide-react";
 import { useTripStops } from "@/lib/useTripStops";
+import HeuteCard from "./HeuteCard";
 
 // Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
 const RealMap = dynamic(() => import("./RealMap"), {
@@ -28,7 +29,7 @@ function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export default function Uebersicht({ projectId, startDate }: { projectId: string; startDate: string | null }) {
+export default function Uebersicht({ projectId, startDate, endDate }: { projectId: string; startDate: string | null; endDate: string | null }) {
   const { items: notizItems, addItem: addNotiz, updateItem: updateNotiz } = useItems(projectId, SECTIONS.NOTIZ);
   const { stops: geoStaysAll, stays, sortedRoute, loading: stopsLoading } = useTripStops(projectId);
   const geoStays = geoStaysAll.filter((s) => s.lat && s.lon);
@@ -50,7 +51,13 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {startDate && <Countdown startDate={startDate} />}
+      {(() => {
+        const today = new Date().toISOString().slice(0, 10);
+        const isOngoing = startDate && today >= startDate && (!endDate || today <= endDate);
+        if (isOngoing) return <HeuteCard projectId={projectId} />;
+        if (startDate) return <Countdown startDate={startDate} />;
+        return null;
+      })()}
 
       {geoStays.length >= 2 && (
         <div style={cardStyle}>

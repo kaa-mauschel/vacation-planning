@@ -49,26 +49,49 @@ export function useTripStops(projectId: string) {
     }));
   const stayByName = new Map(stayPoints.map((p) => [(p.name || "").trim().toLowerCase(), p]));
 
+  // Findet eine Unterkunft, deren Name zum Stationsnamen passt – auch wenn die
+  // Formulierung nicht exakt gleich ist (z. B. Route "Bramberg" vs. Unterkunft
+  // "Wildkogelresort Bramberg am Wildkogel").
+  const findMatchingStay = (name: string) => {
+    const key = name.trim().toLowerCase();
+    if (stayByName.has(key)) return stayByName.get(key)!;
+    for (const [stayKey, stay] of stayByName) {
+      if (stayKey.includes(key) || key.includes(stayKey)) return stay;
+    }
+    return null;
+  };
+
   const chainPoints: any[] = [];
-  const pushChainPoint = (name: string, lat: string, lon: string, country: string, symbol: string, date: string | null) => {
+  // isArrival = true, wenn "date" der Ankunftstag an diesem Ort ist (Ziel einer Etappe),
+  // false, wenn es der Abfahrtstag ist (Start einer Etappe) – vorher wurden beide
+  // fälschlich immer als "Abfahrt" behandelt.
+  const pushChainPoint = (name: string, lat: string, lon: string, country: string, symbol: string, date: string | null, isArrival: boolean) => {
     if (!name || !lat || !lon) return;
     const key = name.trim().toLowerCase();
-    if (chainPoints.length && chainPoints[chainPoints.length - 1].key === key) return;
-    const stay = stayByName.get(key);
+    const stay = findMatchingStay(name);
+    const dedupKey = stay ? `stay:${stay.id}` : key;
+    if (chainPoints.length && chainPoints[chainPoints.length - 1].dedupKey === dedupKey) return;
     if (stay) {
-      chainPoints.push({ ...stay, key, isStay: true });
+      chainPoints.push({ ...stay, key, dedupKey, isStay: true });
     } else {
-      chainPoints.push({ id: `chain-${key}-${chainPoints.length}`, key, name, lat, lon, country, symbol, arrival: null, departure: date, isStay: false });
+      chainPoints.push({
+        id: `chain-${key}-${chainPoints.length}`, key, dedupKey, name, lat, lon, country, symbol,
+        arrival: isArrival ? date : null,
+        departure: isArrival ? null : date,
+        isStay: false,
+      });
     }
   };
 
   sortedRoute.forEach((leg) => {
-    pushChainPoint(leg.data.from, leg.data.lat, leg.data.lon, leg.data.fromCountry || leg.data.land, leg.data.symbol || "", leg.data.date || null);
-    pushChainPoint(leg.data.to, leg.data.toLat, leg.data.toLon, leg.data.toCountry, "", leg.data.date || null);
+    // "Von" der Etappe: das ist der Tag, an dem man von hier abfährt
+    pushChainPoint(leg.data.from, leg.data.lat, leg.data.lon, leg.data.fromCountry || leg.data.land, leg.data.symbol || "", leg.data.date || null, false);
+    // "Nach" der Etappe: das ist der Tag, an dem man hier ankommt
+    pushChainPoint(leg.data.to, leg.data.toLat, leg.data.toLon, leg.data.toCountry, "", leg.data.date || null, true);
   });
 
-  const usedKeys = new Set(chainPoints.map((p) => p.key));
-  const unmatchedStays = stayPoints.filter((p) => !usedKeys.has((p.name || "").trim().toLowerCase()));
+  const usedStayIds = new Set(chainPoints.filter((p) => p.isStay).map((p) => p.id));
+  const unmatchedStays = stayPoints.filter((p) => !usedStayIds.has(p.id));
 
   const combined = [...chainPoints, ...unmatchedStays];
   const stops: TripStop[] = combined.map((s, i) => ({ ...s, listNumber: i + 1 }));

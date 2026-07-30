@@ -154,7 +154,7 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
       </div>
 
       <div style={{ padding: "20px 16px", maxWidth: 720, margin: "0 auto" }}>
-        {tab === "uebersicht" && <Uebersicht projectId={project.id} startDate={project.start_date} />}
+        {tab === "uebersicht" && <Uebersicht projectId={project.id} startDate={project.start_date} endDate={project.end_date} />}
         {tab === "packliste" && <GenericChecklist projectId={project.id} section={SECTIONS.PACKLISTE} />}
         {tab === "vorabreise" && <GenericChecklist projectId={project.id} section={SECTIONS.VORABREISE} />}
         {tab === "route" && <RouteTab projectId={project.id} />}
