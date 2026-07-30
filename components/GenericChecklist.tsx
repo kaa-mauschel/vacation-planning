@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
+import { useCollapsed } from "@/lib/useCollapsed";
 import { STYLE, cardStyle } from "@/lib/style";
 import { SECTIONS, PERSON_COLORS, PERSON_EMOJIS, CATEGORY_ICONS, guessCategoryIcon } from "@/lib/types";
 import { personStyle as fallbackStyle } from "@/lib/personStyle";
@@ -20,7 +21,7 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
   const [editingText, setEditingText] = useState("");
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [editingCatText, setEditingCatText] = useState("");
-  const [collapsedOwners, setCollapsedOwners] = useState<Record<string, boolean>>({});
+  const { collapsed: collapsedOwners, toggle: toggleOwner } = useCollapsed(`collapsed-owners-${section}-${projectId}`);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [newCatIcon, setNewCatIcon] = useState("");
   const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
@@ -149,7 +150,7 @@ export default function GenericChecklist({ projectId, section }: { projectId: st
           <div key={owner} style={{ ...cardStyle, background: owner === ALLGEMEIN ? STYLE.paper : "#F3F0E5", borderLeft: owner !== ALLGEMEIN ? `4px solid ${style.color}` : "none" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <button
-                onClick={() => setCollapsedOwners({ ...collapsedOwners, [owner]: !ownerCollapsed })}
+                onClick={() => toggleOwner(owner)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, background: "none", border: "none", padding: 0, cursor: "pointer" }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16.5, color: owner !== ALLGEMEIN ? style.color : STYLE.ink }}>

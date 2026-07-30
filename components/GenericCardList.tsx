@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useItems } from "@/lib/useItems";
+import { useCollapsed } from "@/lib/useCollapsed";
 import { STYLE, cardStyle } from "@/lib/style";
 import { getAiSuggestions } from "@/lib/aiSuggestions";
 import { calculateDistanceTo } from "@/lib/routing";
@@ -41,9 +42,7 @@ export default function GenericCardList({
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-
-  const toggleGroup = (group: string) => setCollapsed({ ...collapsed, [group]: !collapsed[group] });
+  const { collapsed, toggle: toggleGroup } = useCollapsed(`collapsed-${section}-${projectId}`);
 
   if (loading) return <p style={{ color: "#9A9384", fontSize: 14 }}>Lädt…</p>;
 
