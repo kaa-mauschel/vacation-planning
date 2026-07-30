@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTripStops } from "@/lib/useTripStops";
-import { getDayWeather, datesBetween, weatherInfo, type DayWeather } from "@/lib/weather";
+import { getDayDetail, datesBetween, weatherInfo, type DayDetail } from "@/lib/weather";
 import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag } from "@/lib/types";
 import { CloudSun } from "lucide-react";
@@ -11,8 +11,42 @@ function fmtDay(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
 
+function DayRow({ detail }: { detail: DayDetail }) {
+  if (detail.error || detail.periods.length === 0) {
+    return (
+      <div style={{ padding: "8px 10px", background: STYLE.paperDim, borderRadius: 9, fontSize: 12, color: "#B0A996" }}>
+        {fmtDay(detail.date)}: keine Daten
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: "9px 10px", background: STYLE.paperDim, borderRadius: 9 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{fmtDay(detail.date)}</span>
+        {!detail.isForecast && (
+          <span style={{ fontSize: 10, color: "#B0A996", fontWeight: 600 }} title="Erfahrungswert der letzten 3 Jahre, echte Vorhersage gibt's erst ~2 Wochen vorher">
+            Ø Erfahrungswert
+          </span>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
+        {detail.periods.map((p) => {
+          const info = weatherInfo(p.code);
+          return (
+            <div key={p.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "#fff", borderRadius: 8, padding: "7px 9px", minWidth: 62, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: "#9A9384", fontWeight: 600 }}>{p.label}</span>
+              <span style={{ fontSize: 18 }}>{info.icon}</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, fontWeight: 700 }}>{p.temp}°</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StopWeather({ stop }: { stop: any }) {
-  const [days, setDays] = useState<DayWeather[] | null>(null);
+  const [details, setDetails] = useState<DayDetail[] | null>(null);
 
   // Bei einer Unterkunft: jeder Tag von Anreise bis Abreise. Bei einem reinen
   // Zwischenstopp: nur der eine Tag, an dem man dort ist.
@@ -22,9 +56,9 @@ function StopWeather({ stop }: { stop: any }) {
 
   useEffect(() => {
     let cancelled = false;
-    setDays(null);
-    Promise.all(dates.map((d: string) => getDayWeather(parseFloat(stop.lat), parseFloat(stop.lon), d))).then((res) => {
-      if (!cancelled) setDays(res);
+    setDetails(null);
+    Promise.all(dates.map((d: string) => getDayDetail(parseFloat(stop.lat), parseFloat(stop.lon), d))).then((res) => {
+      if (!cancelled) setDetails(res);
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,23 +78,11 @@ function StopWeather({ stop }: { stop: any }) {
         </span>
       </div>
 
-      {days === null ? (
+      {details === null ? (
         <p style={{ fontSize: 13, color: "#9A9384", margin: 0 }}>Lädt…</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {days.map((d) => {
-            if (d.error) return null;
-            const info = weatherInfo(d.code);
-            return (
-              <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: STYLE.paperDim, borderRadius: 9 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, width: 82, flexShrink: 0 }}>{fmtDay(d.date)}</span>
-                <span style={{ fontSize: 18 }}>{info.icon}</span>
-                <span style={{ fontSize: 12, color: "#6B6558", flex: 1 }}>{info.label}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700 }}>{d.tempMin}°–{d.tempMax}°</span>
-                {!d.isForecast && <span style={{ fontSize: 10.5, color: "#B0A996", fontWeight: 600 }} title="Erfahrungswert der letzten 3 Jahre, echte Vorhersage gibt's erst ~2 Wochen vorher">Ø</span>}
-              </div>
-            );
-          })}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {details.map((d) => <DayRow key={d.date} detail={d} />)}
         </div>
       )}
     </div>
@@ -88,8 +110,8 @@ export default function WeatherTab({ projectId }: { projectId: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <p style={{ fontSize: 12.5, color: "#9A9384", margin: 0 }}>
-        Für Tage in den nächsten ~2 Wochen: echte Vorhersage. Für weiter entfernte Tage: Ø-Erfahrungswert
-        der letzten 3 Jahre zum selben Kalendertag (markiert mit "Ø").
+        Morgens · Mittags · Nachmittags · Abends · Nachts. Für Tage in den nächsten ~2 Wochen: echte
+        Vorhersage. Für weiter entfernte Tage: Ø-Erfahrungswert der letzten 3 Jahre.
       </p>
       {geoStops.map((stop) => (
         <StopWeather key={stop.id} stop={stop} />

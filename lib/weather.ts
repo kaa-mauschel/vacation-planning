@@ -1,7 +1,7 @@
 "use client";
 
 // Kostenloser Wetterdienst ohne Anmeldung/API-Key (Open-Meteo).
-// - Für Tage in den nächsten ca. 15 Tagen: echte Vorhersage
+// - Für Tage in den nächsten ca. 15 Tagen: echte stündliche Vorhersage
 // - Für weiter entfernte Tage: Erfahrungswert aus den letzten 3 Jahren zum selben
 //   Kalendertag (echte Vorhersagen gibt es logischerweise erst kurz vorher)
 
@@ -51,8 +51,47 @@ export function datesBetween(start: string, end: string): string[] {
   return out;
 }
 
-// Wetter für genau einen Tag (Vorhersage falls nah genug dran, sonst Ø aus letzten 3 Jahren)
-export async function getDayWeather(lat: number, lon: number, date: string): Promise<DayWeather> {
+// --- Tageszeiten-Abschnitte ---
+export const DAY_PERIODS = [
+  { key: "morgens", label: "Morgens", hours: [6, 7, 8, 9, 10] },
+  { key: "mittags", label: "Mittags", hours: [11, 12, 13] },
+  { key: "nachmittags", label: "Nachmittags", hours: [14, 15, 16, 17] },
+  { key: "abends", label: "Abends", hours: [18, 19, 20, 21] },
+  { key: "nachts", label: "Nachts", hours: [22, 23, 0, 1, 2, 3, 4, 5] },
+] as const;
+
+export type PeriodWeather = { key: string; label: string; temp: number; code: number };
+export type DayDetail = { date: string; isForecast: boolean; periods: PeriodWeather[]; error?: string };
+
+async function fetchHourly(lat: number, lon: number, date: string, historical: boolean) {
+  const base = historical ? "https://archive-api.open-meteo.com/v1/archive" : "https://api.open-meteo.com/v1/forecast";
+  const url = `${base}?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=temperature_2m,weathercode&timezone=auto`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.hourly as { time: string[]; temperature_2m: number[]; weathercode: number[] } | undefined;
+}
+
+function bucketHourly(hourly: { time: string[]; temperature_2m: number[]; weathercode: number[] }): PeriodWeather[] {
+  return DAY_PERIODS.map((p) => {
+    const temps: number[] = [];
+    const codes: number[] = [];
+    hourly.time.forEach((t, i) => {
+      const hour = parseInt(t.slice(11, 13), 10);
+      if ((p.hours as readonly number[]).includes(hour)) {
+        temps.push(hourly.temperature_2m[i]);
+        codes.push(hourly.weathercode[i]);
+      }
+    });
+    const temp = temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : 0;
+    const counts: Record<number, number> = {};
+    codes.forEach((c) => { counts[c] = (counts[c] || 0) + 1; });
+    const code = codes.length ? Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]) : 0;
+    return { key: p.key, label: p.label, temp, code };
+  });
+}
+
+// Detailliertes Wetter (5 Tageszeiten) für genau einen Tag
+export async function getDayDetail(lat: number, lon: number, date: string): Promise<DayDetail> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(date + "T00:00:00");
@@ -60,43 +99,60 @@ export async function getDayWeather(lat: number, lon: number, date: string): Pro
 
   if (daysUntil >= -1 && daysUntil <= 15) {
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${date}&end_date=${date}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!data.daily?.time?.length) return { date, tempMax: 0, tempMin: 0, code: 0, isForecast: true, error: "Keine Daten" };
-      return {
-        date, isForecast: true,
-        tempMax: data.daily.temperature_2m_max[0], tempMin: data.daily.temperature_2m_min[0], code: data.daily.weathercode[0],
-      };
+      const hourly = await fetchHourly(lat, lon, date, false);
+      if (!hourly) return { date, isForecast: true, periods: [], error: "Keine Daten" };
+      return { date, isForecast: true, periods: bucketHourly(hourly) };
     } catch {
-      return { date, tempMax: 0, tempMin: 0, code: 0, isForecast: true, error: "Fehler beim Laden" };
+      return { date, isForecast: true, periods: [], error: "Fehler beim Laden" };
     }
   }
 
-  // Erfahrungswert: letzte 3 Jahre am selben Kalendertag mitteln
+  // Erfahrungswert: letzte 3 Jahre am selben Kalendertag, stündlich mitteln
   try {
     const now = new Date();
-    const samples: { tempMax: number; tempMin: number; code: number }[] = [];
+    const yearHourlies: { time: string[]; temperature_2m: number[]; weathercode: number[] }[] = [];
     for (let yearsAgo = 1; yearsAgo <= 3; yearsAgo++) {
       const histDate = new Date(target);
       histDate.setFullYear(target.getFullYear() - yearsAgo);
       if (histDate >= now) continue;
-      const dateStr = toISO(histDate);
-      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dateStr}&end_date=${dateStr}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.daily?.time?.length) {
-        samples.push({ tempMax: data.daily.temperature_2m_max[0], tempMin: data.daily.temperature_2m_min[0], code: data.daily.weathercode[0] });
-      }
+      const hourly = await fetchHourly(lat, lon, toISO(histDate), true);
+      if (hourly) yearHourlies.push(hourly);
     }
-    if (samples.length === 0) return { date, tempMax: 0, tempMin: 0, code: 0, isForecast: false, error: "Keine Erfahrungswerte" };
-    const avgMax = Math.round(samples.reduce((s, d) => s + d.tempMax, 0) / samples.length);
-    const avgMin = Math.round(samples.reduce((s, d) => s + d.tempMin, 0) / samples.length);
-    const counts: Record<number, number> = {};
-    samples.forEach((d) => { counts[d.code] = (counts[d.code] || 0) + 1; });
-    const mainCode = Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]);
-    return { date, tempMax: avgMax, tempMin: avgMin, code: mainCode, isForecast: false };
+    if (yearHourlies.length === 0) return { date, isForecast: false, periods: [], error: "Keine Erfahrungswerte" };
+
+    const periods: PeriodWeather[] = DAY_PERIODS.map((p) => {
+      const temps: number[] = [];
+      const codes: number[] = [];
+      yearHourlies.forEach((hourly) => {
+        hourly.time.forEach((t, i) => {
+          const hour = parseInt(t.slice(11, 13), 10);
+          if ((p.hours as readonly number[]).includes(hour)) {
+            temps.push(hourly.temperature_2m[i]);
+            codes.push(hourly.weathercode[i]);
+          }
+        });
+      });
+      const temp = temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : 0;
+      const counts: Record<number, number> = {};
+      codes.forEach((c) => { counts[c] = (counts[c] || 0) + 1; });
+      const code = codes.length ? Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]) : 0;
+      return { key: p.key, label: p.label, temp, code };
+    });
+    return { date, isForecast: false, periods };
   } catch {
-    return { date, tempMax: 0, tempMin: 0, code: 0, isForecast: false, error: "Fehler beim Laden" };
+    return { date, isForecast: false, periods: [], error: "Fehler beim Laden" };
   }
+}
+
+// Einfaches Tagesmaximum/-minimum (für kompakte Badges, z. B. in der Übersicht)
+export async function getDayWeather(lat: number, lon: number, date: string): Promise<DayWeather> {
+  const detail = await getDayDetail(lat, lon, date);
+  if (detail.error || detail.periods.length === 0) {
+    return { date, tempMax: 0, tempMin: 0, code: 0, isForecast: detail.isForecast, error: detail.error || "Keine Daten" };
+  }
+  const temps = detail.periods.map((p) => p.temp);
+  const counts: Record<number, number> = {};
+  detail.periods.forEach((p) => { counts[p.code] = (counts[p.code] || 0) + 1; });
+  const mainCode = Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]);
+  return { date, tempMax: Math.max(...temps), tempMin: Math.min(...temps), code: mainCode, isForecast: detail.isForecast };
 }
