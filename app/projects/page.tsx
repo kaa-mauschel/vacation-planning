@@ -9,6 +9,7 @@ import { useHeaderColor, headerGradient } from "@/lib/theme";
 import type { Project } from "@/lib/types";
 import { Plus, LogOut, Users, X, Luggage, Settings, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import NamePrompt from "@/components/NamePrompt";
+import { todayISO } from "@/lib/dateUtils";
 
 const EMOJIS = ["🧳", "🏔️", "🏖️", "🚐", "🌍", "⛺", "🚢", "🎒", "🚗", "✈️"];
 
@@ -21,7 +22,7 @@ function daysBetween(a: string, b: string) {
 }
 
 function getStatus(start: string | null, end: string | null): { label: string; bg: string; color: string } {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   if (!start && !end) return { label: "Kein Termin", bg: "#EFEADC", color: "#9A9384" };
   if (start && today < start) return { label: "Bevorstehend", bg: "#E4EFE7", color: STYLE.accent };
   if (end && today > end) return { label: "Vorbei", bg: "#EFEADC", color: "#9A9384" };

@@ -11,9 +11,7 @@ import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
 import { MapPin, Sparkles, ArrowRight } from "lucide-react";
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayISO } from "@/lib/dateUtils";
 
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long" });

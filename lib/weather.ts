@@ -1,5 +1,7 @@
 "use client";
 
+import { toLocalISODate as toISO } from "./dateUtils";
+
 // Kostenloser Wetterdienst ohne Anmeldung/API-Key (Open-Meteo).
 // - Für Tage in den nächsten ca. 15 Tagen: echte stündliche Vorhersage
 // - Für weiter entfernte Tage: Erfahrungswert aus den letzten 3 Jahren zum selben
@@ -35,9 +37,8 @@ export function weatherInfo(code: number) {
   return WEATHER_CODES[code] || { icon: "🌡️", label: "" };
 }
 
-function toISO(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
+
+
 
 export function datesBetween(start: string, end: string): string[] {
   const out: string[] = [];

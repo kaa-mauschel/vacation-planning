@@ -8,6 +8,7 @@ import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
 import { MapPin, Sparkles, Home } from "lucide-react";
 import { useTripStops } from "@/lib/useTripStops";
+import { todayISO } from "@/lib/dateUtils";
 import HeuteCard from "./HeuteCard";
 
 // Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
@@ -52,7 +53,7 @@ export default function Uebersicht({ projectId, startDate, endDate }: { projectI
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {(() => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayISO();
         const isOngoing = startDate && today >= startDate && (!endDate || today <= endDate);
         if (isOngoing) return <HeuteCard projectId={projectId} />;
         if (startDate) return <Countdown startDate={startDate} />;
