@@ -7,6 +7,7 @@ import { STYLE, cardStyle } from "@/lib/style";
 import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
 import { MapPin, Sparkles, Home } from "lucide-react";
+import WeatherWidget from "./WeatherWidget";
 
 // Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
 const RealMap = dynamic(() => import("./RealMap"), {
@@ -152,8 +153,11 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
                     {i + 1}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-                      {it.data.country ? guessFlag(it.data.country) : ""} {it.data.symbol || ""} {it.data.station}
+                    <div style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span>{it.data.country ? guessFlag(it.data.country) : ""} {it.data.symbol || ""} {it.data.station}</span>
+                      {it.data.lat && it.data.lon && it.data.von && (
+                        <WeatherWidget lat={it.data.lat} lon={it.data.lon} startDate={it.data.von} endDate={it.data.bis} />
+                      )}
                     </div>
                     {(it.data.von || it.data.bis) && (
                       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#6B6558", marginTop: 1 }}>
