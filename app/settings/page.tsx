@@ -12,6 +12,7 @@ const TAB_LABELS: Record<string, string> = {
   packliste: "Packliste",
   vorabreise: "Vor der Abreise",
   route: "Route",
+  wetter: "Wetter",
   unterkuenfte: "Unterkünfte",
   kosten: "Kosten",
   essen: "Essen & Trinken",

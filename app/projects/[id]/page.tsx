@@ -17,9 +17,10 @@ import Unterkuenfte from "@/components/Unterkuenfte";
 import Kosten from "@/components/Kosten";
 import Tagesplanung from "@/components/Tagesplanung";
 import Tipps from "@/components/Tipps";
+import WeatherTab from "@/components/WeatherTab";
 import ShareProject from "@/components/ShareProject";
 import {
-  ArrowLeft, MapPin, Backpack, ClipboardList, Home, Wallet, Trees,
+  ArrowLeft, MapPin, Backpack, ClipboardList, Home, Wallet, Trees, CloudSun,
   Utensils, Sparkles, Star, CalendarDays, Lightbulb, Share2, Pencil, X, LayoutGrid, Users,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const TABS = [
   { id: "packliste", label: "Packliste", icon: Backpack },
   { id: "vorabreise", label: "Vor der Abreise", icon: ClipboardList },
   { id: "route", label: "Route", icon: MapPin },
+  { id: "wetter", label: "Wetter", icon: CloudSun },
   { id: "unterkuenfte", label: "Unterkünfte", icon: Home },
   { id: "kosten", label: "Kosten", icon: Wallet },
   { id: "essen", label: "Essen & Trinken", icon: Utensils },
@@ -156,6 +158,7 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
         {tab === "packliste" && <GenericChecklist projectId={project.id} section={SECTIONS.PACKLISTE} />}
         {tab === "vorabreise" && <GenericChecklist projectId={project.id} section={SECTIONS.VORABREISE} />}
         {tab === "route" && <RouteTab projectId={project.id} />}
+        {tab === "wetter" && <WeatherTab projectId={project.id} />}
         {tab === "unterkuenfte" && <Unterkuenfte projectId={project.id} />}
         {tab === "kosten" && <Kosten projectId={project.id} />}
         {tab === "essen" && (

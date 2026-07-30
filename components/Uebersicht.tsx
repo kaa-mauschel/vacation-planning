@@ -8,6 +8,7 @@ import { guessFlag, SECTIONS } from "@/lib/types";
 import { useHeaderColor, headerGradient } from "@/lib/theme";
 import { MapPin, Sparkles, Home } from "lucide-react";
 import WeatherWidget from "./WeatherWidget";
+import { useTripStops } from "@/lib/useTripStops";
 
 // Leaflet greift auf window/document zu und darf nicht auf dem Server gerendert werden.
 const RealMap = dynamic(() => import("./RealMap"), {
@@ -29,9 +30,9 @@ function fmtDate(d: string) {
 }
 
 export default function Uebersicht({ projectId, startDate }: { projectId: string; startDate: string | null }) {
-  const { items: routeItems } = useItems(projectId, SECTIONS.ROUTE);
-  const { items: unterkunftItems, loading: unterkunftLoading } = useItems(projectId, SECTIONS.UNTERKUNFT);
   const { items: notizItems, addItem: addNotiz, updateItem: updateNotiz } = useItems(projectId, SECTIONS.NOTIZ);
+  const { stops: geoStaysAll, stays, sortedRoute, loading: stopsLoading } = useTripStops(projectId);
+  const geoStays = geoStaysAll.filter((s) => s.lat && s.lon);
 
   const notiz = notizItems[0];
   const [notizText, setNotizText] = useState("");
@@ -47,68 +48,6 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
       addNotiz({ text: notizText });
     }
   };
-
-  // Reihenfolge exakt wie im Route-Tab (Position = dort festgelegte Reihenfolge, inkl.
-  // Datum + manuellem Verschieben) – wichtig bei mehreren Etappen am selben Tag,
-  // da sonst bei gleichem Datum keine eindeutige Reihenfolge bestünde.
-  const sortedRoute = [...routeItems].sort((a, b) => a.position - b.position);
-
-  // "Wo & wie lange" basiert auf den Unterkünften (die haben die richtigen An-/Abreisedaten).
-  const stays = [...unterkunftItems].sort((a, b) => {
-    if (a.data.von && b.data.von) return a.data.von.localeCompare(b.data.von);
-    if (a.data.von) return -1;
-    if (b.data.von) return 1;
-    return 0;
-  });
-
-  const stayPoints = stays
-    .filter((it) => it.data.lat && it.data.lon)
-    .map((it) => ({
-      id: it.id,
-      name: it.data.station,
-      lat: it.data.lat, lon: it.data.lon,
-      country: it.data.country,
-      symbol: it.data.symbol || "",
-      arrival: it.data.von || null,
-      departure: it.data.bis || null,
-      isStay: true,
-    }));
-  const stayByName = new Map(stayPoints.map((p) => [(p.name || "").trim().toLowerCase(), p]));
-
-  // Die Reihenfolge kommt jetzt direkt aus der Verkettung der Route (Start = "Von" der
-  // allerersten Etappe, danach immer das "Nach" jeder weiteren Etappe der Reihe nach) –
-  // das ist eindeutig, unabhängig vom Datum, und entspricht genau dem, was im Route-Tab
-  // steht. Unterkünfte, deren Name zu einer Station passt, ersetzen den Punkt (mit
-  // Aufenthaltsdauer statt nur Durchreise-Datum).
-  const usedStayKeys = new Set<string>();
-  const chainPoints: any[] = [];
-  const pushChainPoint = (name: string, lat: string, lon: string, country: string, symbol: string, date: string | null) => {
-    if (!name || !lat || !lon) return;
-    const key = name.trim().toLowerCase();
-    if (chainPoints.length && chainPoints[chainPoints.length - 1].key === key) return; // gleicher Ort wie zuvor
-    const stay = stayByName.get(key);
-    if (stay) {
-      usedStayKeys.add(key);
-      chainPoints.push({ ...stay, key, isStay: true });
-    } else {
-      chainPoints.push({ id: `chain-${key}-${chainPoints.length}`, key, name, lat, lon, country, symbol, arrival: null, departure: date, isStay: false });
-    }
-  };
-
-  sortedRoute.forEach((leg) => {
-    // Von-Punkt jeder Etappe (deckt auch Fälle ab, wo beim "Nach" der vorherigen Etappe
-    // aus irgendeinem Grund keine Koordinaten gespeichert wurden)
-    pushChainPoint(leg.data.from, leg.data.lat, leg.data.lon, leg.data.fromCountry || leg.data.land, leg.data.symbol || "", leg.data.date || null);
-    // Nach-Punkt jeder Etappe
-    pushChainPoint(leg.data.to, leg.data.toLat, leg.data.toLon, leg.data.toCountry, "", leg.data.date || null);
-  });
-
-  // Unterkünfte, die sich keiner Etappe zuordnen ließen (Name passt zu keiner Station),
-  // hinten anhängen, nach Anreisedatum sortiert.
-  const unmatchedStays = stayPoints.filter((p) => !usedStayKeys.has((p.name || "").trim().toLowerCase()));
-
-  const combined = [...chainPoints, ...unmatchedStays];
-  const geoStays = combined.map((s, i) => ({ ...s, listNumber: i + 1 }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -131,7 +70,7 @@ export default function Uebersicht({ projectId, startDate }: { projectId: string
           Trage bei mindestens 2 Unterkünften oder Route-Etappen Koordinaten ein (Button "Koordinaten finden" bzw. "berechnen"), um hier eine Landkarte zu sehen.
         </div>
       )}
-      {stays.length === 0 && sortedRoute.length === 0 && !unterkunftLoading && (
+      {stays.length === 0 && sortedRoute.length === 0 && !stopsLoading && (
         <div style={{ ...cardStyle, fontSize: 13, color: "#9A9384" }}>
           Noch keine Unterkünfte oder Route-Etappen eingetragen – dann erscheinen hier Karte und Aufenthaltsdauer.
         </div>
