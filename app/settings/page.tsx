@@ -20,7 +20,6 @@ const TAB_LABELS: Record<string, string> = {
   aktivitaeten: "Aktivitäten",
   umgebung: "Umgebung",
   mustdo: "Must-Dos",
-  tagesplan: "Tagesplanung",
   tipps: "Tipps",
 };
 

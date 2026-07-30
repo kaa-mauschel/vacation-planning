@@ -15,13 +15,12 @@ import GenericCardList from "@/components/GenericCardList";
 import RouteTab from "@/components/RouteTab";
 import Unterkuenfte from "@/components/Unterkuenfte";
 import Kosten from "@/components/Kosten";
-import Tagesplanung from "@/components/Tagesplanung";
 import Tipps from "@/components/Tipps";
 import WeatherTab from "@/components/WeatherTab";
 import ShareProject from "@/components/ShareProject";
 import {
   ArrowLeft, MapPin, Backpack, ClipboardList, Home, Wallet, Trees, CloudSun,
-  Utensils, Sparkles, Star, CalendarDays, Lightbulb, Share2, Pencil, X, LayoutGrid, Users,
+  Utensils, Sparkles, Star, Lightbulb, Share2, Pencil, X, LayoutGrid, Users,
 } from "lucide-react";
 
 const TABS = [
@@ -36,7 +35,6 @@ const TABS = [
   { id: "aktivitaeten", label: "Aktivitäten", icon: Sparkles },
   { id: "umgebung", label: "Umgebung", icon: Trees },
   { id: "mustdo", label: "Must-Dos", icon: Star },
-  { id: "tagesplan", label: "Tagesplanung", icon: CalendarDays },
   { id: "tipps", label: "Tipps", icon: Lightbulb },
 ];
 
@@ -173,7 +171,6 @@ function ProjectPageInner({ project, tab, setTab, showShare, setShowShare, showE
         {tab === "mustdo" && (
           <GenericCardList projectId={project.id} section={SECTIONS.MUSTDO} groupLabel="Region" extraFieldLabel="Adresse/Kontext für Maps" aiKind="mustdo" projectName={project.name} routeContext={routeContext} />
         )}
-        {tab === "tagesplan" && <Tagesplanung projectId={project.id} />}
         {tab === "tipps" && <Tipps projectId={project.id} />}
       </div>
 
