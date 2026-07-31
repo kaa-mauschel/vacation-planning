@@ -8,7 +8,7 @@ import { getAiSuggestions } from "@/lib/aiSuggestions";
 import { calculateDistanceTo } from "@/lib/routing";
 import { SECTIONS, guessFlag } from "@/lib/types";
 import FlagIcon from "./FlagIcon";
-import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home, Compass } from "lucide-react";
+import { MapPin, Star, Heart, Plus, X, Pencil, Sparkles, Loader2, ChevronDown, ChevronUp, Ruler, Home, Compass, Check } from "lucide-react";
 import Link from "next/link";
 
 function mapsSearchLink(name: string, context: string) {
@@ -16,6 +16,7 @@ function mapsSearchLink(name: string, context: string) {
 }
 
 const EMPTY_FORM = { name: "", type: "", group: "", note: "", context: "", rating: "", unterkunftId: "", unterkunftName: "", routeId: "", routeName: "", distance: "" };
+const STARS = [1, 2, 3, 4, 5];
 
 export default function GenericCardList({
   projectId,
@@ -210,11 +211,25 @@ export default function GenericCardList({
                   );
                 }
                 return (
-                  <div key={it.id} style={cardStyle}>
+                  <div key={it.id} style={{ ...cardStyle, opacity: it.data.done ? 0.75 : 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14.5 }}>{it.data.name}</div>
-                        {it.data.type && <div style={{ fontSize: 12, color: "#9A9384", marginTop: 1 }}>{it.data.type}</div>}
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                        <button
+                          onClick={() => updateItem(it.id, { ...it.data, done: !it.data.done })}
+                          title={it.data.done ? "Als nicht gemacht markieren" : "Als gemacht markieren"}
+                          style={{
+                            width: 21, height: 21, borderRadius: 6, flexShrink: 0, marginTop: 2, cursor: "pointer",
+                            border: `2px solid ${it.data.done ? STYLE.accent : "#C9C2B0"}`,
+                            background: it.data.done ? STYLE.accent : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          {it.data.done && <Check size={13} color="#fff" strokeWidth={3} />}
+                        </button>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14.5, textDecoration: it.data.done ? "line-through" : "none" }}>{it.data.name}</div>
+                          {it.data.type && <div style={{ fontSize: 12, color: "#9A9384", marginTop: 1 }}>{it.data.type}</div>}
+                        </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         {it.data.rating ? (
@@ -233,6 +248,19 @@ export default function GenericCardList({
                           <X size={16} />
                         </button>
                       </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 8, marginLeft: 30 }}>
+                      {STARS.map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => updateItem(it.id, { ...it.data, myRating: it.data.myRating === n ? 0 : n })}
+                          style={{ background: "none", border: "none", padding: 1 }}
+                          title={`${n} von 5 Sternen`}
+                        >
+                          <Star size={16} fill={(it.data.myRating || 0) >= n ? STYLE.accent2 : "none"} color={(it.data.myRating || 0) >= n ? STYLE.accent2 : "#D8D2C4"} />
+                        </button>
+                      ))}
+                      {it.data.myRating > 0 && <span style={{ fontSize: 11, color: "#9A9384", marginLeft: 4 }}>deine Bewertung</span>}
                     </div>
                     {it.data.note && <p style={{ fontSize: 13.5, color: "#4A453C", lineHeight: 1.55, margin: "8px 0 0" }}>{it.data.note}</p>}
                     {(it.data.unterkunftName || it.data.routeName || it.data.distance) && (
